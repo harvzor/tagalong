@@ -17,15 +17,28 @@ import java.util.concurrent.TimeUnit
 object DateTakenStore {
     private const val TAG = "DateTakenStore"
 
-    fun registerAndReadBack(context: Context, file: File, captureTimeMillis: Long): Long? {
+    /**
+     * @param relativePath Gallery folder the output is registered under. Defaults to the
+     * app's real save location; callers (e.g. the frozen `:cutdebug` bake-off harness) may
+     * still pass their own.
+     * @param displayName MediaStore file name. Defaults to a collision-proof name so
+     * repeated test runs don't clash; a real save should pass something user-meaningful.
+     */
+    fun registerAndReadBack(
+        context: Context,
+        file: File,
+        captureTimeMillis: Long,
+        relativePath: String = "Movies/Tagalong",
+        displayName: String = "${System.nanoTime()}-${file.name}",
+    ): Long? {
         val resolver = context.contentResolver
         val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
 
         val insertValues = ContentValues().apply {
-            put(MediaStore.Video.Media.DISPLAY_NAME, "${System.nanoTime()}-${file.name}")
+            put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
             put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
             put(MediaStore.Video.Media.DATE_TAKEN, captureTimeMillis)
-            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CutDebug")
+            put(MediaStore.Video.Media.RELATIVE_PATH, relativePath)
             put(MediaStore.Video.Media.IS_PENDING, 1)
         }
         val uri = resolver.insert(collection, insertValues) ?: error("MediaStore insert failed for ${file.name}")
