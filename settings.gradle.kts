@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "tagalong"
 
 include(":cutdebug")
+include(":engine")
