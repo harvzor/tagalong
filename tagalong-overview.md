@@ -47,4 +47,4 @@ These exclusions are deliberate. Feature requests that push toward a general-pur
 1. **Never silently degrade.** If metadata can't be preserved for a given file or format, tell the user before the export, not after.
 2. **Never silently re-encode.** If the user chose lossless, the output is lossless or the operation fails with an explanation.
 3. **The original is never modified.** Always write a new file.
-4. **Assume the output will be verified.** Users should be able to compare source and output with exiftool or MediaInfo and find the tags matching apart from duration and file size.
+4. **Assume the output will be verified.** Users should be able to compare source and output with exiftool or MediaInfo and find that every source tag is present and unchanged in the output, apart from duration and file size. The output tool may add tags of its own (e.g. an encoder tag); that is not a failure. Preservation means no source tag is lost or altered, not that the tag sets are byte-identical.
