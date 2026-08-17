@@ -17,4 +17,4 @@
 ## 4. Verification & commit
 
 - [x] 4.1 Run `openspec validate --change add-agents-md` and confirm no errors
-- [ ] 4.2 Commit: `git add fixtures/ AGENTS.md CLAUDE.md && git commit -m "Add AGENTS.md, CLAUDE.md symlink, and fixtures/ folder"`
+- [x] 4.2 Commit: `git add fixtures/ AGENTS.md CLAUDE.md && git commit -m "Add AGENTS.md, CLAUDE.md symlink, and fixtures/ folder"`
