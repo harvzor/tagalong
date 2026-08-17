@@ -3,6 +3,7 @@ package dev.tagalong.app
 import android.app.Application
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -34,9 +35,32 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
+                    val resolver = getApplication<Application>().contentResolver
+                    // Query the filename from the picker URI.
+                    // On the Google Photopicker (com.google.android.providers.media.module) the
+                    // DISPLAY_NAME column may return the picker's internal numeric ID rather than
+                    // the actual filename. If the result has no extension, append one from the
+                    // MIME type so that baseNameOf() can strip it consistently.
+                    val rawDisplayName = resolver.query(
+                        uri,
+                        arrayOf(MediaStore.MediaColumns.DISPLAY_NAME),
+                        null, null, null,
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0)?.takeIf { it.isNotBlank() } else null
+                    }
+                    val displayName = when {
+                        rawDisplayName != null && rawDisplayName.contains('.') -> rawDisplayName
+                        rawDisplayName != null -> {
+                            val ext = resolver.getType(uri)
+                                ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+                                ?: "mp4"
+                            "$rawDisplayName.$ext"
+                        }
+                        else -> "video.mp4"
+                    }
                     val file = materializeToCache(uri)
                     val durationMs = readDurationMs(file)
-                    PickedSource(uri, file, durationMs)
+                    PickedSource(uri, file, durationMs, displayName)
                 }
             }
             result.onSuccess { source ->
@@ -76,11 +100,14 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                     val output = File(getApplication<Application>().cacheDir, "cut-${System.currentTimeMillis()}.mp4")
                     engine.losslessCut(source.file, state.startMs, state.endMs - state.startMs, output)
 
+                    val outputDisplayName = "${baseNameOf(source.originalDisplayName)}" +
+                        "_from_${formatTimestamp(state.startMs)}" +
+                        "_to_${formatTimestamp(state.endMs)}.mp4"
                     DateTakenStore.registerAndReadBack(
                         context = getApplication(),
                         file = output,
                         captureTimeMillis = captureTimeMillis,
-                        displayName = "tagalong-${System.currentTimeMillis()}.mp4",
+                        displayName = outputDisplayName,
                     )
                 }
             }
@@ -115,4 +142,18 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
             retriever.release()
         }
     }
+
+    /** Produces `HH-MM-SS-mmm` from a millisecond offset, file-safe on all platforms. */
+    private fun formatTimestamp(ms: Long): String {
+        val totalSeconds = ms / 1000
+        val millis = ms % 1000
+        val seconds = totalSeconds % 60
+        val totalMinutes = totalSeconds / 60
+        val minutes = totalMinutes % 60
+        val hours = totalMinutes / 60
+        return "%02d-%02d-%02d-%03d".format(hours, minutes, seconds, millis)
+    }
+
+    /** Strips the file extension from a display name (e.g. `"foo.mp4"` → `"foo"`). */
+    private fun baseNameOf(displayName: String): String = displayName.substringBeforeLast('.')
 }

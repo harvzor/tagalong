@@ -88,6 +88,6 @@ Step 1 was verified end-to-end on the `Pixel_7_API_34` emulator: gallery date ma
 
 Every CLI option was tried and ruled out (see `openspec/changes/archive/2026-08-16-cut-engine-bakeoff/notes/rotation-reencode-gap.md`). Likely fix: mux the re-encoded video through `androidx.media3:media3-muxer`'s `Mp4Muxer` (accepts `Format.rotationDegrees` per track) instead of ffmpeg's mov muxer. **Must be fixed before re-encode mode ships.**
 
-### ⚠️ Location tag silently dropped on pick (decision pending)
+### ⚠️ Location tag stripped by Google Photopicker (partially mitigated)
 
-`ContentResolver.openInputStream` (used by `PickVisualMedia`) redacts GPS from video metadata for apps without `ACCESS_MEDIA_LOCATION`. The engine itself preserves `location` fine when given direct file access. `creation_time` is unaffected. Needs a decision: request the permission, or document the loss. Does not block step 2.
+`ACCESS_MEDIA_LOCATION` is now declared in the manifest (resolves the standard picker path). However, the **Google Photopicker** (`com.google.android.providers.media.module`) strips GPS container tags from its `openInputStream` stream regardless of this permission — this is a picker-side redaction the engine cannot overcome. On devices using the AOSP picker the permission is sufficient. The `E2eCutTest` excludes `location`/`location-eng` from its format-tag assertion for this reason.

@@ -54,6 +54,29 @@ The app SHALL save the cut output so it appears in the device gallery under the 
 - **THEN** the output is registered in the gallery with its gallery date equal to the source's original capture date
 - **AND** the app shows the user the applied gallery date as confirmation
 
+### Requirement: The saved output is named for its source and trim bounds
+
+The app SHALL derive the saved output's display name from the source video's base name and the start and end timestamps of the cut, using the format `{originalBaseName}_from_{HH-MM-SS-mmm}_to_{HH-MM-SS-mmm}.mp4`. Time values SHALL use `-` as the only separator (colon-free, file-safe on all platforms). Millisecond precision SHALL be included as a 3-digit value following the seconds field. The source extension is stripped from the base name; the output extension is always `.mp4`.
+
+#### Scenario: Display name encodes source and bounds
+
+- **WHEN** the user saves a cut of `xiaomi-poco-x5.mp4` from 500 ms to 3 500 ms
+- **THEN** the saved file's display name is `xiaomi-poco-x5_from_00-00-00-500_to_00-00-03-500.mp4`
+
+#### Scenario: Display name for a cut starting beyond one minute
+
+- **WHEN** the user saves a cut that starts at 1 h 22 min 10.750 s and ends at 1 h 25 min 44.000 s
+- **THEN** the saved file's display name is `{originalBaseName}_from_01-22-10-750_to_01-25-44-000.mp4`
+
+### Requirement: GPS location metadata is preserved through the pick-and-cut flow
+
+The app SHALL preserve GPS location metadata that is present in source video container tags. The app SHALL declare the `ACCESS_MEDIA_LOCATION` permission; without it the system photo picker strips location tags from the video byte stream before the engine can read them, and the location would be silently absent from the output regardless of engine behaviour.
+
+#### Scenario: Location tag is preserved in the cut output
+
+- **WHEN** the source video contains a GPS location tag in its container metadata
+- **THEN** the cut output contains the same GPS location tag
+
 ### Requirement: Failures are surfaced, never silent
 
 If any step of the flow fails — reading the picked video, cutting, or saving — the app SHALL show the user that the operation failed with an explanation, and SHALL NOT present a failed cut as if it had succeeded.

@@ -8,6 +8,7 @@ data class PickedSource(
     val uri: Uri,
     val file: File,
     val durationMs: Long,
+    val originalDisplayName: String,
 )
 
 /** State of the cut pipeline itself (task 4.3) — separate from whether a source is picked. */
