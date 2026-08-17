@@ -41,13 +41,23 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                     // DISPLAY_NAME column may return the picker's internal numeric ID rather than
                     // the actual filename. If the result has no extension, append one from the
                     // MIME type so that baseNameOf() can strip it consistently.
-                    val rawDisplayName = resolver.query(
+                    // Query DISPLAY_NAME and RELATIVE_PATH together. On the Google Photopicker
+                    // (com.google.android.providers.media.module) RELATIVE_PATH is redacted to
+                    // null — same sandboxing that strips GPS tags. The displayPath falls back to
+                    // filename-only in that case (design D2).
+                    val (rawDisplayName, relativePath) = resolver.query(
                         uri,
-                        arrayOf(MediaStore.MediaColumns.DISPLAY_NAME),
+                        arrayOf(
+                            MediaStore.MediaColumns.DISPLAY_NAME,
+                            MediaStore.MediaColumns.RELATIVE_PATH,
+                        ),
                         null, null, null,
                     )?.use { cursor ->
-                        if (cursor.moveToFirst()) cursor.getString(0)?.takeIf { it.isNotBlank() } else null
-                    }
+                        if (cursor.moveToFirst())
+                            cursor.getString(0)?.takeIf { it.isNotBlank() } to
+                                cursor.getString(1)?.takeIf { it.isNotBlank() }
+                        else null to null
+                    } ?: (null to null)
                     val displayName = when {
                         rawDisplayName != null && rawDisplayName.contains('.') -> rawDisplayName
                         rawDisplayName != null -> {
@@ -58,9 +68,10 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         else -> "video.mp4"
                     }
+                    val displayPath = if (relativePath != null) "$relativePath$displayName" else displayName
                     val file = materializeToCache(uri)
                     val durationMs = readDurationMs(file)
-                    PickedSource(uri, file, durationMs, displayName)
+                    PickedSource(uri, file, durationMs, displayName, displayPath)
                 }
             }
             result.onSuccess { source ->

@@ -9,6 +9,9 @@ data class PickedSource(
     val file: File,
     val durationMs: Long,
     val originalDisplayName: String,
+    /** Gallery-relative path + filename (e.g. `DCIM/Camera/video.mp4`), or filename only
+     *  when `RELATIVE_PATH` is redacted by the Google Photopicker (design D1/D2). */
+    val displayPath: String,
 )
 
 /** State of the cut pipeline itself (task 4.3) — separate from whether a source is picked. */

@@ -91,3 +91,14 @@ Every CLI option was tried and ruled out (see `openspec/changes/archive/2026-08-
 ### ⚠️ Location tag stripped by Google Photopicker (partially mitigated)
 
 `ACCESS_MEDIA_LOCATION` is now declared in the manifest (resolves the standard picker path). However, the **Google Photopicker** (`com.google.android.providers.media.module`) strips GPS container tags from its `openInputStream` stream regardless of this permission — this is a picker-side redaction the engine cannot overcome. On devices using the AOSP picker the permission is sufficient. The `E2eCutTest` excludes `location`/`location-eng` from its format-tag assertion for this reason.
+
+### ⚠️ Google Photopicker corrupts both RELATIVE_PATH and DISPLAY_NAME
+
+The Google Photopicker redacts **two** MediaStore columns from its re-mapped URIs:
+
+- **`RELATIVE_PATH`** — returns `null`. Handled: `displayPath` falls back to the filename.
+- **`DISPLAY_NAME`** — returns the picker's internal numeric ID (e.g. `1000000072`) instead of the real filename. Handled: if the name has no extension, the MIME type is used to append one (e.g. `1000000072.mp4`). But the result is still a meaningless ID, not the actual filename.
+
+Consequence: on devices using the Google Photopicker, the path label on `CutScreen` will show something like `1000000072.mp4` instead of `DCIM/Camera/xiaomi-poco-x5.mp4`. The output file saved to the gallery inherits the same ID-based display name. On devices using the AOSP picker, both columns resolve correctly.
+
+There is no reliable fix without bypassing the Google Photopicker entirely (e.g. by launching `ACTION_OPEN_DOCUMENT` or the AOSP picker directly). This is a known UX gap; it does not affect the correctness of the cut.

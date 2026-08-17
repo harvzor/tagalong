@@ -1,14 +1,11 @@
 package dev.tagalong.app
 
 import android.net.Uri
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -47,11 +44,13 @@ fun rememberVideoPlayer(file: File): ExoPlayer {
     return player
 }
 
-/** ExoPlayer only *shows* frames here (design D2) — the cut is still done by ffmpeg. */
+/** ExoPlayer only *shows* frames here (design D2) — the cut is still done by ffmpeg.
+ *  Callers are responsible for sizing (width + height/heightIn); this composable
+ *  does not impose its own width or height (design D6). */
 @Composable
 fun VideoPreview(player: ExoPlayer, modifier: Modifier = Modifier) {
     AndroidView(
-        modifier = modifier.fillMaxWidth().height(240.dp),
+        modifier = modifier,
         factory = { context ->
             PlayerView(context).apply {
                 useController = false
