@@ -36,15 +36,10 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     val resolver = getApplication<Application>().contentResolver
-                    // Query the filename from the picker URI.
-                    // On the Google Photopicker (com.google.android.providers.media.module) the
-                    // DISPLAY_NAME column may return the picker's internal numeric ID rather than
-                    // the actual filename. If the result has no extension, append one from the
-                    // MIME type so that baseNameOf() can strip it consistently.
-                    // Query DISPLAY_NAME and RELATIVE_PATH together. On the Google Photopicker
-                    // (com.google.android.providers.media.module) RELATIVE_PATH is redacted to
-                    // null — same sandboxing that strips GPS tags. The displayPath falls back to
-                    // filename-only in that case (design D2).
+                    // Query DISPLAY_NAME and RELATIVE_PATH from the picked URI.
+                    // ACTION_OPEN_DOCUMENT returns the real filename in DISPLAY_NAME and the
+                    // gallery-relative path in RELATIVE_PATH. displayPath falls back to
+                    // filename-only if RELATIVE_PATH is unavailable (design D2).
                     val (rawDisplayName, relativePath) = resolver.query(
                         uri,
                         arrayOf(
@@ -58,16 +53,7 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                                 cursor.getString(1)?.takeIf { it.isNotBlank() }
                         else null to null
                     } ?: (null to null)
-                    val displayName = when {
-                        rawDisplayName != null && rawDisplayName.contains('.') -> rawDisplayName
-                        rawDisplayName != null -> {
-                            val ext = resolver.getType(uri)
-                                ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
-                                ?: "mp4"
-                            "$rawDisplayName.$ext"
-                        }
-                        else -> "video.mp4"
-                    }
+                    val displayName = rawDisplayName ?: "video.mp4"
                     val displayPath = if (relativePath != null) "$relativePath$displayName" else displayName
                     val file = materializeToCache(uri)
                     val durationMs = readDurationMs(file)

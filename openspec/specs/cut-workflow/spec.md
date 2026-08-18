@@ -70,7 +70,7 @@ The app SHALL derive the saved output's display name from the source video's bas
 
 ### Requirement: GPS location metadata is preserved through the pick-and-cut flow
 
-The app SHALL preserve GPS location metadata that is present in source video container tags. The app SHALL declare the `ACCESS_MEDIA_LOCATION` permission; without it the system photo picker strips location tags from the video byte stream before the engine can read them, and the location would be silently absent from the output regardless of engine behaviour.
+The app SHALL preserve GPS location metadata that is present in source video container tags. The app SHALL use a file picker that provides unredacted byte-stream access to the selected video, so that location tags are present in the bytes the cut engine reads and are copied through to the output by the engine's normal metadata-copy path. No permission workaround or manual tag injection SHALL be required.
 
 #### Scenario: Location tag is preserved in the cut output
 
@@ -79,7 +79,7 @@ The app SHALL preserve GPS location metadata that is present in source video con
 
 ### Requirement: The app displays the picked source video's path while the user trims
 
-While a source video is selected and the user is setting the trim range, the app SHALL display the picked video's gallery-relative path (e.g. `DCIM/Camera/PXL_20240101.mp4`). When the gallery-relative path is not available (such as when the Google Photopicker redacts `RELATIVE_PATH`), the app SHALL fall back to displaying the filename only. The path SHALL remain visible throughout the trim-and-cut flow until a new video is picked or the screen is exited.
+While a source video is selected and the user is setting the trim range, the app SHALL display the picked video's gallery-relative path (e.g. `DCIM/Camera/PXL_20240101.mp4`). When the gallery-relative path is not available, the app SHALL fall back to displaying the real filename only. The path SHALL remain visible throughout the trim-and-cut flow until a new video is picked or the screen is exited.
 
 #### Scenario: Path shown when relative path is available
 
@@ -88,8 +88,8 @@ While a source video is selected and the user is setting the trim range, the app
 
 #### Scenario: Filename shown when relative path is unavailable
 
-- **WHEN** the user picks a video via a picker that redacts the relative path
-- **THEN** the app displays the filename only (e.g. `video.mp4`) above the video preview
+- **WHEN** the user picks a video and the gallery relative path cannot be resolved
+- **THEN** the app displays the real filename only (e.g. `video.mp4`) above the video preview
 
 ### Requirement: Failures are surfaced, never silent
 

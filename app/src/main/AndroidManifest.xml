@@ -1,15 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!--
-        Prevents ContentResolver.openInputStream from stripping GPS metadata from video files
-        picked via PickVisualMedia (system photo picker). Without this, the location tag in MP4
-        container metadata is redacted before the engine sees the file — the engine preserves
-        location correctly when given direct access. This is a normal permission with no runtime
-        prompt on API 29+. Resolves the "Location tag silently dropped on pick" open gap in CLAUDE.md.
-    -->
-    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
-
     <application
         android:allowBackup="true"
         android:label="@string/app_name"

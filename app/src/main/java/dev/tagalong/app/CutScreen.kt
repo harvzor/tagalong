@@ -1,7 +1,6 @@
 package dev.tagalong.app
 
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,7 +29,27 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun CutScreen(viewModel: CutViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
 
-    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    // WHY OpenDocument AND NOT PickVisualMedia:
+    // This app's core guarantee is lossless metadata preservation — every container tag in
+    // the source (GPS location, creation_time, device make/model, brand-specific Xiaomi tags)
+    // must survive the cut unchanged.  The Android Photo Picker (PickVisualMedia / ACTION_PICK)
+    // makes this guarantee impossible to fulfil:
+    //
+    //   1. GPS tags — The Google Photo Picker module (com.google.android.providers.media.module)
+    //      strips location tags from the openInputStream byte stream regardless of whether
+    //      ACCESS_MEDIA_LOCATION is declared.  There is no public API to request unredacted
+    //      stream access through the Photo Picker path.
+    //
+    //   2. Real filename — DISPLAY_NAME is replaced with the picker's internal numeric ID
+    //      (e.g. "1000000072"), so the output file inherits a meaningless name.
+    //
+    //   3. Gallery path — RELATIVE_PATH is nulled out, breaking the path label in the UI.
+    //
+    // ACTION_OPEN_DOCUMENT is the standard Android mechanism for granting an app direct,
+    // persistent, unredacted access to a specific file the user explicitly selects.  The app
+    // accesses only that single file; it does not request broad media access.  This is the
+    // narrowest permission model that satisfies the app's metadata-preservation contract.
+    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.onVideoPicked(uri)
     }
 
@@ -52,7 +71,7 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                        pickVideo.launch(arrayOf("video/*"))
                     },
                 ) {
                     Text("Pick video")
@@ -92,7 +111,7 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                    pickVideo.launch(arrayOf("video/*"))
                 },
             ) {
                 Text("Pick a different video")

@@ -15,16 +15,16 @@ class FfmpegCutEngine : CutEngine {
 
     override fun losslessCut(source: File, startMs: Long, durationMs: Long, output: File) {
         execute(
-            listOf(
-                "-y",
-                "-ss", secondsArg(startMs),
-                "-i", source.absolutePath,
-                "-to", secondsArg(durationMs),
-                "-c", "copy",
-                "-map_metadata", "0",
-                "-movflags", "+faststart+use_metadata_tags",
-                output.absolutePath,
-            )
+            buildList {
+                add("-y")
+                add("-ss"); add(secondsArg(startMs))
+                add("-i"); add(source.absolutePath)
+                add("-to"); add(secondsArg(durationMs))
+                add("-c"); add("copy")
+                add("-map_metadata"); add("0")
+                add("-movflags"); add("+faststart+use_metadata_tags")
+                add(output.absolutePath)
+            }
         )
     }
 

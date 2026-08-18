@@ -10,7 +10,7 @@ data class PickedSource(
     val durationMs: Long,
     val originalDisplayName: String,
     /** Gallery-relative path + filename (e.g. `DCIM/Camera/video.mp4`), or filename only
-     *  when `RELATIVE_PATH` is redacted by the Google Photopicker (design D1/D2). */
+     *  when `RELATIVE_PATH` is unavailable (design D2). */
     val displayPath: String,
 )
 

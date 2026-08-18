@@ -78,8 +78,8 @@ class E2eCutTest {
         // 2. Click "Pick video" in the app
         composeTestRule.onNodeWithText("Pick video").performClick()
 
-        // 3. Drive the system photo picker with UIAutomator
-        PhotoPickerRobot.selectFirstItem(device)
+        // 3. Drive the system file picker (ACTION_OPEN_DOCUMENT) with UIAutomator
+        FilePickerRobot.selectItem(device)
 
         // 4. Wait for "Cut and save" to appear (picker accepted; ViewModel loaded the source)
         composeTestRule.waitUntil(WAIT_PICKER_MS) {
@@ -97,12 +97,8 @@ class E2eCutTest {
             composeTestRule.onAllNodesWithText("Saved", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
 
-        // 8. Locate the output in MediaStore.
-        //    The Google Photopicker (com.google.android.providers.media.module) may return its
-        //    internal picker_id as the DISPLAY_NAME on the picked URI rather than the actual
-        //    filename — so we can't predict the exact base name.  Instead, search for a video
-        //    added AFTER the cut started whose name contains "_from_" (always present in our
-        //    output naming scheme, never in the seeded file's name).
+        // 8. Locate the output in MediaStore by the "_from_" substring that is always present
+        //    in the output naming scheme and never in the seeded file's name.
         val foundUri = MediaStoreSeeder.findRecentlyAdded(
             context,
             afterEpochSeconds = cutStartEpochSeconds - 1, // small buffer for clock skew
@@ -133,19 +129,10 @@ class E2eCutTest {
         } ?: error("Could not open output from MediaStore: $foundUri")
         val outputProbe = MetadataReader.probe(outputFile)
 
-        // 10. All source format tags (except those the picker path strips) must be present in the
-        //     output unchanged.
-        //
-        //     KNOWN GAP (see CLAUDE.md "Location tag silently dropped on pick"):
-        //     The Google Photopicker (com.google.android.providers.media.module) strips GPS
-        //     container tags (`location`, `location-eng`) from the byte stream it exposes via
-        //     openInputStream, regardless of ACCESS_MEDIA_LOCATION — this is a picker-side
-        //     redaction that the engine cannot overcome. The engine preserves location fine
-        //     when given direct file access; this limitation is in the pick step, not the cut.
-        //     Exclude those tags so the test doesn't fail for something the engine didn't break.
-        val pickerRedactedTags = setOf("location", "location-eng")
-        val tagsToCheck = sourceProbe.formatTags.filterKeys { it !in pickerRedactedTags }
-        val formatDiff = MetadataAssertions.sourceTagsSubsetOfOutput(tagsToCheck, outputProbe.formatTags)
+        // 10. All source format tags must be present in the output unchanged — including GPS.
+        //     ACTION_OPEN_DOCUMENT provides an unredacted byte stream, so -map_metadata 0
+        //     copies location tags and all other format tags automatically.
+        val formatDiff = MetadataAssertions.sourceTagsSubsetOfOutput(sourceProbe.formatTags, outputProbe.formatTags)
         assertTrue(
             "Format tags lost or changed: missing=${formatDiff.missing} changed=${formatDiff.changed}",
             formatDiff.isSubset,
