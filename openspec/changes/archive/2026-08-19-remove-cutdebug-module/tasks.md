@@ -10,4 +10,4 @@
 
 ## 3. Commit
 
-- [ ] 3.1 Stage and commit with message: `Remove :cutdebug bake-off harness (findings archived)`
+- [x] 3.1 Stage and commit with message: `Remove :cutdebug bake-off harness (findings archived)`
