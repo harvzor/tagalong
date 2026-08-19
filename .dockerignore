@@ -1,0 +1,19 @@
+# Host-specific
+local.properties
+
+# Generated / build output
+.gradle/
+build/
+*/build/
+out/
+
+# IDE
+.idea/
+.kotlin/
+*.iml
+
+# Version control
+.git/
+
+# Test fixtures (not needed for release builds)
+**/src/androidTest/

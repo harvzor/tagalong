@@ -1,0 +1,6 @@
+# Default: let Git normalise text files using platform line endings on checkout
+* text=auto
+
+# Shell scripts must always be LF — CRLF breaks execution in Linux containers
+gradlew text eol=lf
+*.sh text eol=lf
