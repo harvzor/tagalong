@@ -21,8 +21,8 @@
 
 ## 4. Verify debug build
 
-- [ ] 4.1 Run `docker build --output=out .` and confirm an APK appears in `out/`
-- [ ] 4.2 Confirm no container is left running after the build
+- [x] 4.1 Run `docker build --output=out .` and confirm an APK appears in `out/`
+- [x] 4.2 Confirm no container is left running after the build
 
 ## 5. README.md
 
@@ -30,4 +30,4 @@
 
 ## 6. Commit
 
-- [ ] 6.1 Stage and commit: `Add Dockerfile, .dockerignore, signing config, and README`
+- [x] 6.1 Stage and commit: `Add Dockerfile, .dockerignore, signing config, and README`
