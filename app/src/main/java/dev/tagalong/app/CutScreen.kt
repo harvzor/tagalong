@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -79,42 +81,53 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
             }
         } else {
             val player = rememberVideoPlayer(source.file)
-            // Gallery-relative path label (spec cut-workflow; design D2).
-            Text(
-                text = source.displayPath,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // Full-width preview; height capped so portrait clips don't push controls off-screen
-            // (design D6). PlayerView honours the aspect ratio once the video is decoded.
-            VideoPreview(
-                player = player,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
-            )
-            TrimRangeSlider(
-                durationMs = source.durationMs,
-                startMs = uiState.startMs,
-                endMs = uiState.endMs,
-                player = player,
-                onRangeChanged = viewModel::onRangeChanged,
-            )
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { viewModel.runCut() },
-                enabled = uiState.cutState != CutState.Working,
+            // Scrollable inner Column so probe cards below the controls don't overflow
+            // the screen (design D5). The outer Column remains fillMaxSize so the empty-
+            // state button still centres via weight; only the source-picked path scrolls.
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Cut and save")
-            }
-            // Demoted to OutlinedButton so "Cut and save" has clear visual priority (design D4).
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    pickVideo.launch(arrayOf("video/*"))
-                },
-            ) {
-                Text("Pick a different video")
+                // Gallery-relative path label (spec cut-workflow; design D2).
+                Text(
+                    text = source.displayPath,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                // Full-width preview; height capped so portrait clips don't push controls
+                // off-screen (design D6). PlayerView honours the aspect ratio once decoded.
+                VideoPreview(
+                    player = player,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                )
+                TrimRangeSlider(
+                    durationMs = source.durationMs,
+                    startMs = uiState.startMs,
+                    endMs = uiState.endMs,
+                    player = player,
+                    onRangeChanged = viewModel::onRangeChanged,
+                )
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { viewModel.runCut() },
+                    enabled = uiState.cutState != CutState.Working,
+                ) {
+                    Text("Cut and save")
+                }
+                // Demoted to OutlinedButton so "Cut and save" has clear visual priority (design D4).
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { pickVideo.launch(arrayOf("video/*")) },
+                ) {
+                    Text("Pick a different video")
+                }
+                // Probe cards — source appears at pick time, output appears after cut (probe-viewer).
+                uiState.sourceProbe?.let { ProbeCard("Source", it) }
+                uiState.outputProbe?.let { ProbeCard("Cut output", it) }
             }
         }
 

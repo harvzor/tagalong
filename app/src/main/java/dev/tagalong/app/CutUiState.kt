@@ -1,6 +1,7 @@
 package dev.tagalong.app
 
 import android.net.Uri
+import dev.tagalong.engine.MediaProbe
 import java.io.File
 
 /** The picked source, materialized to a cache `File` the engine can read (design D1). */
@@ -27,4 +28,6 @@ data class CutUiState(
     val startMs: Long = 0L,
     val endMs: Long = 0L,
     val cutState: CutState = CutState.Idle,
+    val sourceProbe: MediaProbe? = null,
+    val outputProbe: MediaProbe? = null,
 )

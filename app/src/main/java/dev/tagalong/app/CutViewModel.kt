@@ -57,15 +57,19 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                     val displayPath = if (relativePath != null) "$relativePath$displayName" else displayName
                     val file = materializeToCache(uri)
                     val durationMs = readDurationMs(file)
-                    PickedSource(uri, file, durationMs, displayName, displayPath)
+                    val source = PickedSource(uri, file, durationMs, displayName, displayPath)
+                    // Probe is best-effort for display — a failure here must not block the pick.
+                    val probe = runCatching { MetadataReader.probe(file) }.getOrNull()
+                    source to probe
                 }
             }
-            result.onSuccess { source ->
+            result.onSuccess { (source, probe) ->
                 _uiState.value = CutUiState(
                     source = source,
                     startMs = 0L,
                     endMs = source.durationMs,
                     cutState = CutState.Idle,
+                    sourceProbe = probe,
                 )
             }.onFailure { e ->
                 _uiState.value = CutUiState(cutState = CutState.Error(e.message ?: "Could not read the picked video"))
@@ -97,19 +101,28 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                     val output = File(getApplication<Application>().cacheDir, "cut-${System.currentTimeMillis()}.mp4")
                     engine.losslessCut(source.file, state.startMs, state.endMs - state.startMs, output)
 
+                    // Probe the output while it is still a cache File (before DateTakenStore moves
+                    // it into MediaStore, after which only a content:// URI is available and
+                    // FFprobeKit cannot consume it). Best-effort: a failure here must not block save.
+                    val outputProbe = runCatching { MetadataReader.probe(output) }.getOrNull()
+
                     val outputDisplayName = "${baseNameOf(source.originalDisplayName)}" +
                         "_from_${formatTimestamp(state.startMs)}" +
                         "_to_${formatTimestamp(state.endMs)}.mp4"
-                    DateTakenStore.registerAndReadBack(
+                    val galleryDate = DateTakenStore.registerAndReadBack(
                         context = getApplication(),
                         file = output,
                         captureTimeMillis = captureTimeMillis,
                         displayName = outputDisplayName,
                     )
+                    galleryDate to outputProbe
                 }
             }
-            result.onSuccess { galleryDate ->
-                _uiState.value = _uiState.value.copy(cutState = CutState.Saved(galleryDate))
+            result.onSuccess { (galleryDate, outputProbe) ->
+                _uiState.value = _uiState.value.copy(
+                    cutState = CutState.Saved(galleryDate),
+                    outputProbe = outputProbe,
+                )
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(cutState = CutState.Error(e.message ?: "Cut failed"))
             }
