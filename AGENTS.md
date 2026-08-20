@@ -66,6 +66,14 @@ This app's primary function is **lossless video trimming with complete metadata 
 
 `ACTION_OPEN_DOCUMENT` is the standard Android mechanism for granting an app **direct, persistent, unredacted access to a single file the user explicitly selects**. The app requests no broad media permissions and accesses only the file the user picks. This is the narrowest permission model that satisfies the metadata-preservation contract that is the app's reason for existing.
 
+## Why the app declares ACCESS_MEDIA_LOCATION
+
+> This section exists to support Play Store review responses.
+
+Even with `ACTION_OPEN_DOCUMENT`, Android's media framework strips GPS location tags from the `ContentResolver.openInputStream` byte stream for apps that have not been granted `ACCESS_MEDIA_LOCATION` (API 29+). The stripping occurs at the `MediaDocumentsProvider` layer — it is not specific to the Photo Picker path — so any app that materialises a picked video via `openInputStream` without this permission will receive a byte stream with location already removed, regardless of which file picker was used.
+
+`ACCESS_MEDIA_LOCATION` is declared and requested so that the framework delivers an unredacted byte stream. The permission is used exclusively to **read** GPS coordinates that are already embedded in a specific video file the user explicitly selects; it is never used to track the user's current location, infer movement, or share location data with any third party. The app has no analytics, no network calls, and no backend — there is nowhere for location data to go beyond the output video file saved to the user's own gallery.
+
 ---
 
 ## OpenSpec workflow

@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+        ACCESS_MEDIA_LOCATION is required so that Android's media framework delivers an
+        unredacted byte stream when the picked video is materialised to the local cache via
+        ContentResolver.openInputStream. Without it the media module silently strips GPS
+        location tags from the stream even when ACTION_OPEN_DOCUMENT is used. This permission
+        reads — it does not collect — location that is already embedded in a specific file
+        the user explicitly selects. The app requests no broad media access and never uses
+        location for tracking or analytics. See CLAUDE.md for the full rationale.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+
     <application
         android:allowBackup="true"
         android:label="@string/app_name"

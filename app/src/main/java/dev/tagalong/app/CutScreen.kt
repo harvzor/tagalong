@@ -1,5 +1,7 @@
 package dev.tagalong.app
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -21,10 +23,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
@@ -51,8 +58,43 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
     // persistent, unredacted access to a specific file the user explicitly selects.  The app
     // accesses only that single file; it does not request broad media access.  This is the
     // narrowest permission model that satisfies the app's metadata-preservation contract.
+    //
+    // WHY ACCESS_MEDIA_LOCATION IS ALSO REQUIRED:
+    // Even with ACTION_OPEN_DOCUMENT, Android's media framework strips GPS location tags from
+    // ContentResolver.openInputStream unless the calling app holds ACCESS_MEDIA_LOCATION.  The
+    // stripping happens at the MediaDocumentsProvider stream level — it is not unique to the
+    // Photo Picker path.  Holding this permission causes the framework to deliver the raw,
+    // unredacted bytes so that location tags reach the cut engine and are copied through to
+    // the output automatically.  The permission is requested just before the picker launches;
+    // if the user denies it the pick still proceeds but a warning is shown.
+    val context = LocalContext.current
+    var locationPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_MEDIA_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
     val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.onVideoPicked(uri)
+    }
+
+    // Request ACCESS_MEDIA_LOCATION; on result update state and — if granted — open the picker.
+    // If denied the user still gets to pick, just without unredacted GPS bytes in the stream.
+    val requestLocationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        locationPermissionGranted = granted
+        pickVideo.launch(arrayOf("video/*"))
+    }
+
+    // Use wherever the picker should launch: request the permission first if not yet granted.
+    val launchPick: () -> Unit = {
+        if (locationPermissionGranted) {
+            pickVideo.launch(arrayOf("video/*"))
+        } else {
+            requestLocationPermission.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
+        }
     }
 
     Column(
@@ -72,11 +114,18 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
             ) {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        pickVideo.launch(arrayOf("video/*"))
-                    },
+                    onClick = launchPick,
                 ) {
                     Text("Pick video")
+                }
+                // Shown only when the user has denied ACCESS_MEDIA_LOCATION — GPS tags will
+                // likely be absent from the stream so the warning prepares them for that outcome.
+                if (!locationPermissionGranted) {
+                    Text(
+                        text = "GPS location may not be preserved — location access was denied",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             }
         } else {
@@ -121,7 +170,7 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
                 // Demoted to OutlinedButton so "Cut and save" has clear visual priority (design D4).
                 OutlinedButton(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = { pickVideo.launch(arrayOf("video/*")) },
+                    onClick = launchPick,
                 ) {
                     Text("Pick a different video")
                 }
