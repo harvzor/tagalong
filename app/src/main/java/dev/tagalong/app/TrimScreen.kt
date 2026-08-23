@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,11 +33,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 
 @Composable
-fun CutScreen(viewModel: CutViewModel = viewModel()) {
+fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val cutState = uiState.cutState
+
+    // Navigate to the result screen as soon as the cut succeeds. ResultScreen calls
+    // viewModel.resetCutState() before popping back, so this LaunchedEffect will not
+    // re-trigger when returning to this screen (cutState will be Idle again).
+    LaunchedEffect(cutState) {
+        if (cutState is CutState.Saved) {
+            navController.navigate("result") { launchSingleTop = true }
+        }
+    }
 
     // WHY OpenDocument AND NOT PickVisualMedia:
     // This app's core guarantee is lossless metadata preservation — every container tag in
@@ -132,7 +143,7 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
             }
         } else {
             val player = rememberVideoPlayer(source.file)
-            // Scrollable inner Column so probe cards below the controls don't overflow
+            // Scrollable inner Column so the probe card below the controls doesn't overflow
             // the screen (design D5). The outer Column remains fillMaxSize so the empty-
             // state button still centres via weight; only the source-picked path scrolls.
             Column(
@@ -141,9 +152,10 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // Gallery-relative path label (spec cut-workflow; design D2).
+                // Absolute path label — falls back to gallery-relative path, then filename
+                // only, when the absolute path could not be resolved (spec cut-workflow; design D2).
                 Text(
-                    text = source.displayPath,
+                    text = source.absolutePath ?: source.displayPath,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -165,7 +177,7 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { viewModel.runCut() },
-                    enabled = uiState.cutState != CutState.Working,
+                    enabled = cutState != CutState.Working,
                 ) {
                     Text("Cut and save")
                 }
@@ -176,29 +188,26 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
                 ) {
                     Text("Pick a different video")
                 }
-                // Probe cards — source appears at pick time, output appears after cut (probe-viewer).
+                // Source probe card — reference while trimming (probe-viewer spec).
+                // Output metadata is shown on the ResultScreen after a successful cut.
                 uiState.sourceProbe?.let { ProbeCard("Source", it) }
-                uiState.outputProbe?.let { ProbeCard("Cut output", it) }
             }
         }
 
-        CutStateStatus(uiState.cutState)
+        TrimCutStateStatus(cutState)
     }
 }
 
+/** Status row shown at the bottom of the trim screen. "Saved" is not shown here — navigation
+ *  to ResultScreen fires immediately on that transition. */
 @Composable
-private fun CutStateStatus(cutState: CutState) {
+private fun TrimCutStateStatus(cutState: CutState) {
     when (cutState) {
-        is CutState.Idle -> Unit
+        is CutState.Idle, is CutState.Saved -> Unit
         is CutState.Working -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             CircularProgressIndicator()
             Text("Cutting…")
         }
-        is CutState.Saved -> Text(
-            text = cutState.galleryDateMillis?.let { "Saved — gallery date ${formatGalleryDate(it)}" }
-                ?: "Saved — gallery date could not be confirmed",
-            color = MaterialTheme.colorScheme.primary,
-        )
         is CutState.Error -> Text(
             text = "Failed: ${cutState.message}",
             color = MaterialTheme.colorScheme.error,

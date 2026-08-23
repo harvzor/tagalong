@@ -4,11 +4,22 @@ import android.content.ContentValues
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+
+/**
+ * Returned by [DateTakenStore.registerAndReadBack] — carries the confirmed gallery date
+ * and the absolute storage path of the newly-registered file (may be null if the legacy
+ * DATA column is not populated on this device).
+ */
+data class SaveResult(
+    val dateTakenMillis: Long?,
+    val absolutePath: String?,
+)
 
 /**
  * Writes a cut output into MediaStore with `DATE_TAKEN` set to the source's original
@@ -30,7 +41,7 @@ object DateTakenStore {
         captureTimeMillis: Long,
         relativePath: String = "Movies/Tagalong",
         displayName: String = "${System.nanoTime()}-${file.name}",
-    ): Long? {
+    ): SaveResult {
         val resolver = context.contentResolver
         val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
 
@@ -50,9 +61,19 @@ object DateTakenStore {
         val commitValues = ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }
         resolver.update(uri, commitValues, null, null)
 
+        // Construct the absolute path from the known parameters rather than querying the
+        // DATA column — DATA can be null under scoped storage even for app-inserted rows
+        // on API 30+ emulators. The primary external storage root is stable on all Android
+        // devices targeted by this app (minSdk 31).
+        val absolutePath = Environment.getExternalStorageDirectory().absolutePath +
+            "/" + relativePath.trimEnd('/') + "/" + displayName
+
         rescanBestEffort(context, uri)
 
-        return readDateTaken(context, uri)
+        return SaveResult(
+            dateTakenMillis = readDateTaken(context, uri),
+            absolutePath = absolutePath,
+        )
     }
 
     /** Best-effort explicit rescan via the legacy DATA path, to exercise "after the file is

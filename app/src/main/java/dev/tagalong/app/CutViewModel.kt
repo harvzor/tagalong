@@ -1,8 +1,11 @@
 package dev.tagalong.app
 
 import android.app.Application
+import android.content.ContentUris
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.AndroidViewModel
@@ -36,28 +39,89 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     val resolver = getApplication<Application>().contentResolver
-                    // Query DISPLAY_NAME and RELATIVE_PATH from the picked URI.
-                    // ACTION_OPEN_DOCUMENT returns the real filename in DISPLAY_NAME and the
-                    // gallery-relative path in RELATIVE_PATH. displayPath falls back to
-                    // filename-only if RELATIVE_PATH is unavailable (design D2).
-                    val (rawDisplayName, relativePath) = resolver.query(
+                    data class SourceMeta(
+                        val displayName: String,
+                        val relativePath: String?,
+                        val absolutePath: String?,
+                    )
+                    // Resolve the source path. ACTION_OPEN_DOCUMENT can return URIs from
+                    // several document providers; each has its own document-ID format:
+                    //
+                    //  • ExternalStorageProvider  (com.android.externalstorage.documents)
+                    //    docId = "primary:DCIM/Camera/foo.mp4"
+                    //    → the path after ':' is the relative path from the storage root.
+                    //
+                    //  • MediaDocumentsProvider   (com.android.providers.media.documents)
+                    //    docId = "video:1234"
+                    //    → the number after ':' is the MediaStore _ID; query via msUri.
+                    //
+                    // We decode each case to an absolute path and let everything fall back to
+                    // a DISPLAY_NAME-only query on the document URI.
+                    val meta: SourceMeta = runCatching {
+                        val authority = uri.authority ?: ""
+                        val docId = DocumentsContract.getDocumentId(uri)
+                        when {
+                            authority == "com.android.externalstorage.documents" -> {
+                                // docId: "primary:DCIM/Camera/foo.mp4"
+                                val relativePart = docId.substringAfter(':') // "DCIM/Camera/foo.mp4"
+                                val name = relativePart.substringAfterLast('/')
+                                val dir  = relativePart.substringBeforeLast('/', missingDelimiterValue = "")
+                                val absPath = Environment.getExternalStorageDirectory().absolutePath +
+                                    "/" + relativePart
+                                val relPath = if (dir.isNotEmpty()) "$dir/" else null
+                                SourceMeta(name, relPath, absPath)
+                            }
+                            authority == "com.android.providers.media.documents" -> {
+                                // docId: "video:1234"
+                                val rowId = docId.substringAfter(':').toLong()
+                                val msUri = ContentUris.withAppendedId(
+                                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI, rowId
+                                )
+                                resolver.query(
+                                    msUri,
+                                    arrayOf(
+                                        MediaStore.MediaColumns.DISPLAY_NAME,
+                                        MediaStore.MediaColumns.RELATIVE_PATH,
+                                        MediaStore.MediaColumns.DATA,
+                                    ),
+                                    null, null, null,
+                                )?.use { cursor ->
+                                    if (cursor.moveToFirst()) {
+                                        val name = cursor.getString(0)?.takeIf { it.isNotBlank() }
+                                        val rel  = cursor.getString(1)?.takeIf { it.isNotBlank() }
+                                        val data = cursor.getString(2)?.takeIf { it.isNotBlank() }
+                                        val absPath = data
+                                            ?: if (rel != null && name != null)
+                                                Environment.getExternalStorageDirectory().absolutePath +
+                                                    "/" + rel.trimEnd('/') + "/" + name
+                                               else null
+                                        SourceMeta(name ?: "video.mp4", rel, absPath)
+                                    } else null
+                                }
+                            }
+                            else -> null
+                        }
+                    }.getOrNull()
+                    // Fall back to querying the document URI itself for DISPLAY_NAME only.
+                    ?: resolver.query(
                         uri,
-                        arrayOf(
-                            MediaStore.MediaColumns.DISPLAY_NAME,
-                            MediaStore.MediaColumns.RELATIVE_PATH,
-                        ),
+                        arrayOf(MediaStore.MediaColumns.DISPLAY_NAME),
                         null, null, null,
                     )?.use { cursor ->
                         if (cursor.moveToFirst())
-                            cursor.getString(0)?.takeIf { it.isNotBlank() } to
-                                cursor.getString(1)?.takeIf { it.isNotBlank() }
-                        else null to null
-                    } ?: (null to null)
-                    val displayName = rawDisplayName ?: "video.mp4"
-                    val displayPath = if (relativePath != null) "$relativePath$displayName" else displayName
+                            SourceMeta(cursor.getString(0) ?: "video.mp4", null, null)
+                        else null
+                    }
+                    ?: SourceMeta("video.mp4", null, null)
+
+                    val displayName = meta.displayName
+                    val displayPath = if (meta.relativePath != null) {
+                        meta.relativePath.trimEnd('/') + "/" + displayName
+                    } else displayName
+                    val absolutePath = meta.absolutePath
                     val file = materializeToCache(uri)
                     val durationMs = readDurationMs(file)
-                    val source = PickedSource(uri, file, durationMs, displayName, displayPath)
+                    val source = PickedSource(uri, file, durationMs, displayName, displayPath, absolutePath)
                     // Probe is best-effort for display — a failure here must not block the pick.
                     val probe = runCatching { MetadataReader.probe(file) }.getOrNull()
                     source to probe
@@ -75,6 +139,17 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = CutUiState(cutState = CutState.Error(e.message ?: "Could not read the picked video"))
             }
         }
+    }
+
+    /** Resets the cut pipeline back to Idle (keeping the source and trim range intact) so that
+     *  the TrimScreen's navigation LaunchedEffect does not re-trigger when returning from the
+     *  ResultScreen. Called by ResultScreen before it pops the back stack. */
+    fun resetCutState() {
+        _uiState.value = _uiState.value.copy(
+            cutState = CutState.Idle,
+            outputProbe = null,
+            outputCacheFile = null,
+        )
     }
 
     /** Spec: "the start point cannot be set later than the end point." */
@@ -109,19 +184,25 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                     val outputDisplayName = "${baseNameOf(source.originalDisplayName)}" +
                         "_from_${formatTimestamp(state.startMs)}" +
                         "_to_${formatTimestamp(state.endMs)}.mp4"
-                    val galleryDate = DateTakenStore.registerAndReadBack(
+                    val saveResult = DateTakenStore.registerAndReadBack(
                         context = getApplication(),
                         file = output,
                         captureTimeMillis = captureTimeMillis,
                         displayName = outputDisplayName,
                     )
-                    galleryDate to outputProbe
+                    Triple(saveResult, outputProbe, output)
                 }
             }
-            result.onSuccess { (galleryDate, outputProbe) ->
+            result.onSuccess { (saveResult, outputProbe, outputFile) ->
                 _uiState.value = _uiState.value.copy(
-                    cutState = CutState.Saved(galleryDate),
+                    cutState = CutState.Saved(
+                        galleryDateMillis = saveResult.dateTakenMillis,
+                        outputAbsolutePath = saveResult.absolutePath,
+                    ),
                     outputProbe = outputProbe,
+                    // Keep the cache File reference for ResultScreen playback. DateTakenStore
+                    // copies from it rather than moving it, so it remains readable here.
+                    outputCacheFile = outputFile,
                 )
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(cutState = CutState.Error(e.message ?: "Cut failed"))

@@ -84,7 +84,7 @@ abstract class CutEngineContractTest {
         val captureTimeMillis = Instant.parse(
             requireNotNull(sourceProbe.formatTags["creation_time"]) { "source has no creation_time" }
         ).toEpochMilli()
-        val dateTaken = DateTakenStore.registerAndReadBack(context, output, captureTimeMillis)
-        assertEquals("[$label] MediaStore.DATE_TAKEN must equal source capture date", captureTimeMillis, dateTaken)
+        val saveResult = DateTakenStore.registerAndReadBack(context, output, captureTimeMillis)
+        assertEquals("[$label] MediaStore.DATE_TAKEN must equal source capture date", captureTimeMillis, saveResult.dateTakenMillis)
     }
 }
