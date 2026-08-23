@@ -60,7 +60,7 @@ This app's primary function is **lossless video trimming with complete metadata 
 
 | What the Photo Picker breaks | Why it cannot be worked around |
 |---|---|
-| **GPS location tags** — the Google Photo Picker module (`com.google.android.providers.media.module`) strips `location` and `location-eng` tags from the `openInputStream` byte stream, regardless of `ACCESS_MEDIA_LOCATION` being declared | No public API exists to request an unredacted byte stream through the Photo Picker path; `MediaStore.setRequireOriginal` throws `UnsupportedOperationException` on the Play Store module |
+| **GPS location tags** — the Google Photo Picker module (`com.google.android.providers.media.module`) strips `location` and `location-eng` tags from the `openInputStream` byte stream, regardless of `ACCESS_MEDIA_LOCATION` being declared **or granted at runtime** (verified on-device 2026-08-23: granting the permission via `RequestPermission` before launching `PickVisualMedia` still produced output with no location tag) | No public API exists to request an unredacted byte stream through the Photo Picker path; `MediaStore.setRequireOriginal` throws `UnsupportedOperationException` on the Play Store module |
 | **Real filename** — `DISPLAY_NAME` is replaced with the picker's internal numeric ID (e.g. `1000000072`) | The output file would inherit a meaningless name the user did not give it |
 | **Gallery path** — `RELATIVE_PATH` is nulled out | The path label shown to the user while trimming would be incomplete |
 

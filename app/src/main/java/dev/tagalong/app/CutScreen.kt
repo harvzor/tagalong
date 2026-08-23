@@ -46,8 +46,10 @@ fun CutScreen(viewModel: CutViewModel = viewModel()) {
     //
     //   1. GPS tags — The Google Photo Picker module (com.google.android.providers.media.module)
     //      strips location tags from the openInputStream byte stream regardless of whether
-    //      ACCESS_MEDIA_LOCATION is declared.  There is no public API to request unredacted
-    //      stream access through the Photo Picker path.
+    //      ACCESS_MEDIA_LOCATION is declared or granted at runtime (verified on-device,
+    //      2026-08-23: granting the permission via RequestPermission before launching
+    //      PickVisualMedia still produced output with no location tag).  There is no public
+    //      API to request unredacted stream access through the Photo Picker path.
     //
     //   2. Real filename — DISPLAY_NAME is replaced with the picker's internal numeric ID
     //      (e.g. "1000000072"), so the output file inherits a meaningless name.
