@@ -24,7 +24,7 @@
 
 ## 5. On-device verification
 
-- [ ] 5.1 Nudge: confirm both step sizes move the handle and seek the player; confirm clamping at clip start, clip end, and against the opposite handle
-- [ ] 5.2 Tap-to-edit: type a valid `M:SS.t` time, hit Done, confirm handle and player both move to the typed position
-- [ ] 5.3 Tap-to-edit: type an invalid format and a valid-format-but-out-of-range value; confirm the error indicator appears and the handle does not move
-- [ ] 5.4 Keyboard layout: confirm the trim controls remain reachable (scrollable into view) when the keyboard is open on the test AVD
+- [x] 5.1 Nudge: confirm both step sizes move the handle and seek the player; confirm clamping at clip start, clip end, and against the opposite handle
+- [x] 5.2 Tap-to-edit: type a valid `M:SS.t` time, hit Done, confirm handle and player both move to the typed position
+- [x] 5.3 Tap-to-edit: type an invalid format and a valid-format-but-out-of-range value; confirm the error indicator appears and the handle does not move
+- [x] 5.4 Keyboard layout: confirm the trim controls remain reachable (scrollable into view) when the keyboard is open on the test AVD
