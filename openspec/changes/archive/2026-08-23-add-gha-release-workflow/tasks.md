@@ -9,6 +9,6 @@
 
 ## 3. Verify
 
-- [ ] 3.1 Push a test tag (e.g. `v0.1.0`) and confirm the workflow runs to completion in GitHub Actions
-- [ ] 3.2 Confirm the GitHub Release is created for the tag with `tagalong-0.1.0.apk` attached
-- [ ] 3.3 Verify the APK is signed: `apksigner verify --verbose tagalong-0.1.0.apk` (or `apksigner.bat` on Windows)
+- [x] 3.1 Push a test tag (e.g. `v0.1.0`) and confirm the workflow runs to completion in GitHub Actions
+- [x] 3.2 Confirm the GitHub Release is created for the tag with `tagalong-0.1.0.apk` attached
+- [x] 3.3 Verify the APK is signed: `apksigner verify --verbose tagalong-0.1.0.apk` (or `apksigner.bat` on Windows)
