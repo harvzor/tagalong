@@ -44,16 +44,16 @@ fun rememberVideoPlayer(file: File): ExoPlayer {
     return player
 }
 
-/** ExoPlayer only *shows* frames here (design D2) — the cut is still done by ffmpeg.
- *  Callers are responsible for sizing (width + height/heightIn); this composable
- *  does not impose its own width or height (design D6). */
+/** Renders [player] via [PlayerView] with the built-in transport controls enabled
+ *  (play/pause, seekbar, time display). The cut is still performed by ffmpeg — ExoPlayer
+ *  is used for preview only. Callers are responsible for sizing (width + heightIn); this
+ *  composable does not impose its own dimensions. */
 @Composable
 fun VideoPreview(player: ExoPlayer, modifier: Modifier = Modifier) {
     AndroidView(
         modifier = modifier,
         factory = { context ->
             PlayerView(context).apply {
-                useController = false
                 this.player = player
             }
         },

@@ -75,6 +75,8 @@ fun TrimRangeSlider(
 
     // Nudge: apply immediately, update the text field to reflect the new value (design D4, D5)
     fun nudge(delta: Long) {
+        // Pause before seeking so the seeked frame is rendered cleanly (design D3)
+        if (player.isPlaying) player.pause()
         val newMs = when (editTarget) {
             is EditTarget.Start -> (startMs + delta).coerceIn(0L, endMs - 100L)
             is EditTarget.End   -> (endMs   + delta).coerceIn(startMs + 100L, durationMs)
@@ -117,6 +119,8 @@ fun TrimRangeSlider(
             value = startMs.toFloat()..endMs.toFloat(),
             valueRange = 0f..durationMs.coerceAtLeast(1L).toFloat(),
             onValueChange = { range ->
+                // Pause before seeking so the dragged frame renders cleanly (design D3)
+                if (player.isPlaying) player.pause()
                 val newStart = range.start.toLong()
                 val newEnd = range.endInclusive.toLong()
                 seekTargetMs = if (newStart != startMs) newStart else newEnd

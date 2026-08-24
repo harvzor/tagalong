@@ -31,6 +31,7 @@ The app SHALL present a preview of the selected video together with a trim range
 
 - **WHEN** the user drags a trim handle to a new position
 - **THEN** the preview shows the frame at that position
+- **AND** if playback was active it SHALL be paused before the seek
 
 ### Requirement: User can run a lossless cut of the chosen range
 
@@ -187,4 +188,28 @@ The app SHALL allow the user to directly type a time value for each trim handle 
 
 - **WHEN** the user dismisses the edit field without submitting (back gesture or tap outside)
 - **THEN** the field closes with no change to the trim position
+
+### Requirement: User can play the video with audio
+
+The app SHALL allow the user to play the selected video with audio in the preview area. The player SHALL provide transport controls including play, pause, and free seeking across the full clip duration. The app SHALL automatically stop playback when the playhead reaches the trim end point, regardless of whether the user started playing from within or beyond the trimmed region. When the trim end point changes while playback is active, the new end point SHALL become the stop boundary immediately.
+
+#### Scenario: Video plays with audio from current position
+
+- **WHEN** the user activates play
+- **THEN** the video plays in real-time with audio from the current playhead position
+
+#### Scenario: Playback stops at trim end point
+
+- **WHEN** playback is active and the playhead reaches the trim end time
+- **THEN** playback pauses automatically
+
+#### Scenario: Seeking past trim end then playing still stops at trim end
+
+- **WHEN** the user seeks the playhead to a position beyond the trim end time and then activates play
+- **THEN** playback pauses automatically when the playhead reaches the trim end time
+
+#### Scenario: Adjusting trim end during playback updates stop boundary
+
+- **WHEN** the user adjusts the trim end handle while playback is active
+- **THEN** the new trim end time becomes the stop boundary immediately
 

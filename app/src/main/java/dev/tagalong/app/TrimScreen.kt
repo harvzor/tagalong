@@ -21,8 +21,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.media3.common.Player
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -143,6 +146,37 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
             }
         } else {
             val player = rememberVideoPlayer(source.file)
+            // Stop playback when the playhead reaches the trim end point (design D2). The effect
+            // key is endMs only — any change to the trim end restarts the coroutine so the new
+            // boundary is picked up immediately. Polling at 100 ms keeps CPU impact negligible
+            // while limiting overshoot to ~one poll interval.
+            LaunchedEffect(uiState.endMs) {
+                while (true) {
+                    if (player.isPlaying && player.currentPosition >= uiState.endMs) {
+                        player.pause()
+                    }
+                    delay(100)
+                }
+            }
+            // When play starts from before the trim in-point, snap to startMs so pressing
+            // play always begins the preview at the chosen cut point rather than wherever
+            // the playhead happens to be. Seeking within [startMs, endMs] is unaffected.
+            val startMs = uiState.startMs
+            val endMs = uiState.endMs
+            DisposableEffect(player, startMs, endMs) {
+                val listener = object : Player.Listener {
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        // Snap to startMs if the playhead is outside [startMs, endMs] when
+                        // play is pressed — covers both fresh videos (position 0 < startMs)
+                        // and replay after the trim end stop (position >= endMs).
+                        if (isPlaying && (player.currentPosition < startMs || player.currentPosition >= endMs)) {
+                            player.seekTo(startMs)
+                        }
+                    }
+                }
+                player.addListener(listener)
+                onDispose { player.removeListener(listener) }
+            }
             // Scrollable inner Column so the probe card below the controls doesn't overflow
             // the screen (design D5). The outer Column remains fillMaxSize so the empty-
             // state button still centres via weight; only the source-picked path scrolls.
