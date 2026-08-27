@@ -26,9 +26,11 @@ class MainActivity : ComponentActivity() {
                     // screen a separate instance — which would lose all state on navigation.
                     val viewModel: CutViewModel = viewModel()
                     val navController = rememberNavController()
-                    NavHost(navController = navController, startDestination = "trim") {
+                    NavHost(navController = navController, startDestination = "home") {
+                        composable("home") { HomeScreen(navController, viewModel) }
                         composable("trim") { TrimScreen(navController, viewModel) }
                         composable("result") { ResultScreen(navController, viewModel) }
+                        composable("about") { AboutScreen(navController) }
                     }
                 }
             }

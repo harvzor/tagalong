@@ -16,8 +16,11 @@ import dev.tagalong.engine.MetadataReader
 import java.io.File
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -31,6 +34,11 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(CutUiState())
     val uiState: StateFlow<CutUiState> = _uiState
+
+    /** Fires once when a picked video is ready for trimming. HomeScreen collects this to
+     *  navigate to the trim screen after the async materialise-and-probe work completes. */
+    private val _navigateToTrim = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val navigateToTrim: SharedFlow<Unit> = _navigateToTrim.asSharedFlow()
 
     /** Uri → cache `File` (D1), then probe its duration. Resets any prior source/cut state. */
     fun onVideoPicked(uri: Uri) {
@@ -135,6 +143,7 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                     cutState = CutState.Idle,
                     sourceProbe = probe,
                 )
+                _navigateToTrim.tryEmit(Unit)
             }.onFailure { e ->
                 _uiState.value = CutUiState(cutState = CutState.Error(e.message ?: "Could not read the picked video"))
             }

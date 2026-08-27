@@ -41,7 +41,7 @@ fun ResultScreen(navController: NavController, viewModel: CutViewModel) {
     val cutState        = remember { uiState.cutState as? CutState.Saved }
     val sourceProbe     = remember { uiState.sourceProbe }
     val outputProbe     = remember { uiState.outputProbe }
-    val outputCacheFile = remember { uiState.outputCacheFile as java.io.File? }
+    val outputCacheFile = remember { uiState.outputCacheFile }
 
     // Intercept the system back button/gesture so resetCutState() is always called before
     // popping. Without this, the system back bypasses the in-app arrow's onClick handler,
