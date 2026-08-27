@@ -1,18 +1,44 @@
-# Tagalong
+# Tagalong: Video Cutter
 
-An Android app for **lossless video trimming with complete metadata preservation**. Every container tag in the source file — GPS location, `creation_time`, device make/model, brand-specific tags — survives the cut unchanged.
+*Trim and convert video. Your metadata comes along.*
 
-## Why ACTION_OPEN_DOCUMENT instead of the Photo Picker
+---
 
-Tagalong's core contract is that no metadata is lost during a trim. The standard Android Photo Picker (`PickVisualMedia` / `ACTION_PICK`) makes this impossible:
+When you trim a clip in a typical mobile editor, the output loses the date it was shot, the GPS coordinates, and the camera information the phone recorded. The video is fine; the record of when and where it happened is gone. The gallery then files it under today's date, and the original context is unrecoverable.
 
-| What the Photo Picker breaks | Why it cannot be worked around |
+Tagalong fixes that one problem.
+
+## What Tagalong doesn't do
+
+- No multi-track timeline
+- No filters, transitions, stickers, or music
+- No account, no cloud, no export watermark
+
+## What gets preserved
+
+| | |
 |---|---|
-| **GPS location tags** — the Google Photo Picker module strips `location` and `location-eng` tags from the `openInputStream` byte stream, regardless of `ACCESS_MEDIA_LOCATION` being declared | No public API exists to request an unredacted byte stream through the Photo Picker path; `MediaStore.setRequireOriginal` throws `UnsupportedOperationException` on the Play Store module |
-| **Real filename** — `DISPLAY_NAME` is replaced with the picker's internal numeric ID (e.g. `1000000072`) | The output file would inherit a meaningless name the user did not give it |
-| **Gallery path** — `RELATIVE_PATH` is nulled out | The path label shown to the user while trimming would be incomplete |
+| **Creation date** | The date the video was shot, not the date it was edited |
+| **GPS location** | Coordinates embedded in the source, unchanged |
+| **Camera information** | Make, model, and manufacturer-specific tags |
+| **Orientation** | Portrait clips stay portrait, with rotation properly signalled rather than baked into the frames |
+| **Gallery date** | The date your gallery displays — stored separately from container metadata, and the thing most editors silently get wrong |
 
-`ACTION_OPEN_DOCUMENT` is the standard Android mechanism for granting an app direct, persistent, unredacted access to a single file the user explicitly selects. The app requests no broad media permissions and accesses only the file the user picks — the narrowest permission model that satisfies the metadata-preservation contract.
+## How It Works
+
+Tagalong uses FFmpeg to copy the video and audio streams without re-encoding, with options that carry all container tags through to the output unchanged. Cuts snap to the nearest keyframe — an inherent constraint of lossless cutting that the app surfaces rather than hides.
+
+Files are selected via `ACTION_OPEN_DOCUMENT` rather than the standard Android Photo Picker (which would otherwise strip GPS tags).
+
+## Install
+
+Download the latest APK from [GitHub Releases](https://github.com/harvzor/tagalong/releases) and install it on your phone.
+
+## Permissions
+
+| Permission | Why |
+|---|---|
+| **ACCESS_MEDIA_LOCATION** | Android's media framework strips GPS location tags from any `openInputStream` call made without this permission — even when `ACTION_OPEN_DOCUMENT` is used. This permission ensures Tagalong receives an unredacted byte stream for the file you explicitly selected. It is used exclusively to read location that is already embedded in that file; the app has no analytics, no network calls, and no backend. |
 
 ## Building
 
@@ -66,7 +92,6 @@ Release APKs are signed inside the Docker build using a keystore stored as GitHu
 To populate these secrets:
 
 ```bash
-# Encode the keystore
 gh secret set RELEASE_KEYSTORE_BASE64 --body "$(base64 -w0 release.keystore)"
 gh secret set RELEASE_KEYSTORE_PASSWORD --body "<store-password>"
 gh secret set RELEASE_KEY_ALIAS --body "release"
