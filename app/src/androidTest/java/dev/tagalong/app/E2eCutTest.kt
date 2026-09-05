@@ -1,5 +1,6 @@
 package dev.tagalong.app
 
+import android.Manifest
 import android.net.Uri
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.UiDevice
 import dev.tagalong.engine.MetadataReader
 import java.io.File
@@ -36,6 +38,12 @@ class E2eCutTest {
 
     @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
+
+    /** The app requests this before opening ACTION_OPEN_DOCUMENT so picked bytes retain GPS tags. */
+    @get:Rule
+    val permissionRule: GrantPermissionRule = GrantPermissionRule.grant(
+        Manifest.permission.ACCESS_MEDIA_LOCATION,
+    )
 
     /** Target-app context — used for ContentResolver and cacheDir. */
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
@@ -92,9 +100,11 @@ class E2eCutTest {
         // 6. Click "Cut and save"
         composeTestRule.onNodeWithText("Cut and save").performClick()
 
-        // 7. Wait for "Saved" status (generous timeout — ffmpeg-kit + swiftshader can be slow)
+        // 7. Wait for the result screen (generous timeout — ffmpeg-kit + swiftshader can be slow).
+        //    A successful cut navigates directly to ResultScreen; it no longer renders a "Saved"
+        //    status row on the trim screen.
         composeTestRule.waitUntil(WAIT_CUT_MS) {
-            composeTestRule.onAllNodesWithText("Saved", substring = true).fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Cut result").fetchSemanticsNodes().isNotEmpty()
         }
 
         // 8. Locate the output in MediaStore by the "_from_" substring that is always present

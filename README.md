@@ -50,16 +50,6 @@ docker build --output=out .
 
 The APK is written to `./out/app-debug.apk`.
 
-### Local emulator testing
-
-For local testing, start an Android emulator and run this from the repository root:
-
-```bash
-./scripts/push-fixtures-to-emulator.sh
-```
-
-The script pushes supported videos from `fixtures/` into the emulator's `/sdcard/DCIM/` directory and triggers Android's media scanner. The videos will then be available in Gallery and in Tagalong's **Pick video** picker. The emulator must be running and `adb` must be available from the Android SDK platform-tools. Rerun the command after wiping or replacing an emulator.
-
 To build a signed release APK locally (requires a keystore — see [Releases](#releases)):
 
 ```bash
@@ -78,6 +68,49 @@ docker build \
 ```
 
 The signed APK is written to `./out/tagalong-<version>.apk`. The keystore and credential values are never baked into any image layer.
+
+### Local emulator testing
+
+For local testing, start an Android emulator and run this from the repository root:
+
+```bash
+./scripts/push-fixtures-to-emulator.sh
+```
+
+The script pushes supported videos from `fixtures/` into the emulator's `/sdcard/DCIM/` directory and triggers Android's media scanner. The videos will then be available in Gallery and in Tagalong's **Pick video** picker. The emulator must be running and `adb` must be available from the Android SDK platform-tools. Rerun the command after wiping or replacing an emulator.
+
+### Instrumented tests
+
+Instrumented tests require a connected Android emulator. The current test setup has been verified against the `Medium_Phone` AVD running Android 17 (API 37), with the `sdk_gphone16k_arm64` device image.
+
+Confirm that the emulator is connected:
+
+```bash
+adb devices
+adb -s emulator-5554 emu avd name
+```
+
+Run the app end-to-end test:
+
+```bash
+# macOS/Linux
+bash ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.tagalong.app.E2eCutTest
+
+# Windows PowerShell
+.\gradlew.bat :app:connectedDebugAndroidTest `
+  "-Pandroid.testInstrumentationRunnerArguments.class=dev.tagalong.app.E2eCutTest"
+```
+
+Run the engine instrumented test suite:
+
+```bash
+# macOS/Linux
+bash ./gradlew :engine:connectedAndroidTest
+
+# Windows PowerShell
+.\gradlew.bat :engine:connectedAndroidTest
+```
 
 ## Releases
 
