@@ -50,6 +50,16 @@ docker build --output=out .
 
 The APK is written to `./out/app-debug.apk`.
 
+### Local emulator testing
+
+For local testing, start an Android emulator and run this from the repository root:
+
+```bash
+./scripts/push-fixtures-to-emulator.sh
+```
+
+The script pushes supported videos from `fixtures/` into the emulator's `/sdcard/DCIM/` directory and triggers Android's media scanner. The videos will then be available in Gallery and in Tagalong's **Pick video** picker. The emulator must be running and `adb` must be available from the Android SDK platform-tools. Rerun the command after wiping or replacing an emulator.
+
 To build a signed release APK locally (requires a keystore — see [Releases](#releases)):
 
 ```bash
