@@ -1,4 +1,4 @@
-# Tagalong: Video Cutter
+# Tagalong: Android Video Cutter
 
 *Trim and convert video. Your metadata comes along.*
 
@@ -16,13 +16,13 @@ Tagalong fixes that one problem.
 
 ## What gets preserved
 
-| | |
-|---|---|
-| **Creation date** | The date the video was shot, not the date it was edited |
-| **GPS location** | Coordinates embedded in the source, unchanged |
-| **Camera information** | Make, model, and manufacturer-specific tags |
-| **Orientation** | Portrait clips stay portrait, with rotation properly signalled rather than baked into the frames |
-| **Gallery date** | The date your gallery displays — stored separately from container metadata, and the thing most editors silently get wrong |
+| What                   | In detail                                                                                                                 |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------|
+| **Creation date**      | The date the video was shot, not the date it was edited                                                                   |
+| **GPS location**       | Coordinates embedded in the source, unchanged                                                                             |
+| **Camera information** | Make, model, and manufacturer-specific tags                                                                               |
+| **Orientation**        | Portrait clips stay portrait, with rotation properly signalled rather than baked into the frames                          |
+| **Gallery date**       | The date your gallery displays — stored separately from container metadata, and the thing most editors silently get wrong |
 
 ## How It Works
 
@@ -36,8 +36,8 @@ Download the latest APK from [GitHub Releases](https://github.com/harvzor/tagalo
 
 ## Permissions
 
-| Permission | Why |
-|---|---|
+| Permission                | Why                                                                                                                                                                                                                                                                                                                                                                                                              |
+|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **ACCESS_MEDIA_LOCATION** | Android's media framework strips GPS location tags from any `openInputStream` call made without this permission — even when `ACTION_OPEN_DOCUMENT` is used. This permission ensures Tagalong receives an unredacted byte stream for the file you explicitly selected. It is used exclusively to read location that is already embedded in that file; the app has no analytics, no network calls, and no backend. |
 
 ## Building
