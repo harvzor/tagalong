@@ -14,8 +14,10 @@ class FfmpegCutEngine : CutEngine {
     override val name = "ffmpeg-kit"
 
     override fun losslessCut(source: File, startMs: Long, durationMs: Long, output: File) {
-        execute(
-            buildList {
+        executeAndFinalize(
+            source = source,
+            output = output,
+            args = buildList {
                 add("-y")
                 add("-ss"); add(secondsArg(startMs))
                 add("-i"); add(source.absolutePath)
@@ -24,7 +26,7 @@ class FfmpegCutEngine : CutEngine {
                 add("-map_metadata"); add("0")
                 add("-movflags"); add("+faststart+use_metadata_tags")
                 add(output.absolutePath)
-            }
+            },
         )
     }
 
@@ -55,7 +57,16 @@ class FfmpegCutEngine : CutEngine {
             add("-movflags"); add("+faststart+use_metadata_tags")
             add(output.absolutePath)
         }
+        executeAndFinalize(source, output, args)
+    }
+
+    private fun executeAndFinalize(source: File, output: File, args: List<String>) {
         execute(args)
+        runCatching { Mp4LocationFinalizer.preserve(source, output) }
+            .onFailure {
+                output.delete()
+                throw it
+            }
     }
 
     private fun secondsArg(millis: Long): String = String.format(Locale.US, "%.3f", millis / 1000.0)

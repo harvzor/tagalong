@@ -28,7 +28,9 @@ Tagalong fixes that one problem.
 
 Tagalong uses FFmpeg to copy the video and audio streams without re-encoding, with options that carry all container tags through to the output unchanged. Cuts snap to the nearest keyframe — an inherent constraint of lossless cutting that the app surfaces rather than hides.
 
-Files are selected via `ACTION_OPEN_DOCUMENT` rather than the standard Android Photo Picker (which would otherwise strip GPS tags).
+Files are selected via `ACTION_OPEN_DOCUMENT` rather than the Android Photo Picker. The Photo Picker can strip GPS from the bytes it gives an app, replace the real filename with an internal numeric ID, and omit the gallery-relative path. `ACTION_OPEN_DOCUMENT` gives Tagalong direct, persistent access to the one file the user explicitly selected, so the original bytes and their metadata can be read.
+
+There is one more subtlety to GPS preservation: an MP4 can store a logical location in different physical forms. Device-originated videos may carry the gallery-compatible QuickTime `moov/udta/©xyz` atom, while FFprobe can normalize that and a generic `mdta/location` entry to the same logical `location` tag. A logical FFprobe value alone is therefore not enough to prove compatibility; Tagalong preserves and checks the raw `©xyz` representation because gallery applications such as Google Photos may ignore the generic form. Both canonical device samples in this repository contain the QuickTime location atom, although their coordinates are intentionally not documented here.
 
 ## Install
 

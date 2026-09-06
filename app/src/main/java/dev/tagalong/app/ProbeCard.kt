@@ -63,9 +63,13 @@ fun ProbeCard(label: String, probe: MediaProbe) {
                 value = allTags["creation_time"]?.let { formatCreationTime(it) } ?: "—",
             )
 
-            // location — show "location" if present, fall back to "location-eng", else "—"
+            // FFprobe normalizes several physical MP4 representations to this logical value.
             val locationValue = allTags["location"] ?: allTags["location-eng"]
             ProbeRow(key = "location", value = locationValue ?: "—")
+            ProbeRow(
+                key = "location representation",
+                value = probe.locationRepresentation.representation.label,
+            )
 
             // rotation
             ProbeRow(

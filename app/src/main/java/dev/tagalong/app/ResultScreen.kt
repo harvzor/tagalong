@@ -20,28 +20,56 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 
+private data class ResultSnapshot(
+    val cutState: CutState.Saved,
+    val sourceProbe: dev.tagalong.engine.MediaProbe?,
+    val outputProbe: dev.tagalong.engine.MediaProbe?,
+    val outputCacheFile: java.io.File?,
+)
+
 @Composable
 fun ResultScreen(navController: NavController, viewModel: CutViewModel) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Snapshot the relevant state on first composition. When the user presses back,
-    // resetCutState() clears the ViewModel immediately but the screen is still briefly
-    // visible during the transition — without snapshots it would flash "unavailable"
-    // fallbacks for one frame before popping. remember{} with no key runs once and holds
-    // its value for the entire lifetime of this back-stack entry.
-    val cutState        = remember { uiState.cutState as? CutState.Saved }
-    val sourceProbe     = remember { uiState.sourceProbe }
-    val outputProbe     = remember { uiState.outputProbe }
-    val outputCacheFile = remember { uiState.outputCacheFile }
+    // Populate the snapshot when Saved state arrives rather than at the first composition.
+    // Navigation can compose this destination before the StateFlow update is observed. A
+    // one-time unkeyed remember would then permanently retain null probes and render empty
+    // metadata. We intentionally do not clear the snapshot when resetCutState() runs: the
+    // result remains visible during the back-stack transition without flashing fallbacks.
+    var snapshot by remember { mutableStateOf<ResultSnapshot?>(null) }
+    LaunchedEffect(
+        uiState.cutState,
+        uiState.sourceProbe,
+        uiState.outputProbe,
+        uiState.outputCacheFile,
+    ) {
+        val saved = uiState.cutState as? CutState.Saved ?: return@LaunchedEffect
+        if (snapshot == null || (snapshot?.outputProbe == null && uiState.outputProbe != null)) {
+            snapshot = ResultSnapshot(
+                cutState = saved,
+                sourceProbe = uiState.sourceProbe,
+                outputProbe = uiState.outputProbe,
+                outputCacheFile = uiState.outputCacheFile,
+            )
+        }
+    }
+
+    val cutState        = snapshot?.cutState
+    val sourceProbe     = snapshot?.sourceProbe
+    val outputProbe     = snapshot?.outputProbe
+    val outputCacheFile = snapshot?.outputCacheFile
 
     // Intercept the system back button/gesture so resetCutState() is always called before
     // popping. Without this, the system back bypasses the in-app arrow's onClick handler,

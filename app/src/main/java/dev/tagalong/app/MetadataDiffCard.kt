@@ -61,50 +61,78 @@ fun MetadataDiffCard(sourceProbe: MediaProbe, outputProbe: MediaProbe) {
 
     // --- curated row data ---
 
-    data class DiffRow(val key: String, val sourceValue: String, val outputValue: String) {
-        val changed: Boolean get() = outputValue != sourceValue
-    }
+    data class DiffRowData(
+        val key: String,
+        val sourceValue: String,
+        val outputValue: String,
+        val changed: Boolean = outputValue != sourceValue,
+    )
 
-    fun creationTimeRow(): DiffRow {
+    fun creationTimeRow(): DiffRowData {
         val src = sourceTags["creation_time"]?.let { formatDiffCreationTime(it) } ?: "—"
         val out = outputTags["creation_time"]?.let { formatDiffCreationTime(it) } ?: "—"
-        return DiffRow("creation_time", src, out)
+        return DiffRowData("creation_time", src, out)
     }
 
-    fun locationRow(): DiffRow {
+    fun locationRow(): DiffRowData {
         val src = sourceTags["location"] ?: sourceTags["location-eng"] ?: "—"
         val out = outputTags["location"] ?: outputTags["location-eng"] ?: "—"
-        return DiffRow("location", src, out)
+        return DiffRowData("location", src, out)
     }
 
-    fun rotationRow(): DiffRow {
+    fun locationRepresentationRow(): DiffRowData {
+        val src = sourceProbe.locationRepresentation
+        val out = outputProbe.locationRepresentation
+        val requiredRepresentationLost =
+            (src.hasQuickTime &&
+                (!out.hasQuickTime || !src.quickTimePayloadsEqual(out))) ||
+                !out.genericMdtaKeys.containsAll(src.genericMdtaKeys)
+        return DiffRowData(
+            key = "location representation",
+            sourceValue = src.representation.label,
+            outputValue = out.representation.label,
+            changed = requiredRepresentationLost,
+        )
+    }
+
+    fun rotationRow(): DiffRowData {
         val src = sourceProbe.videoRotationDegrees?.let { "${it}°" } ?: "—"
         val out = outputProbe.videoRotationDegrees?.let { "${it}°" } ?: "—"
-        return DiffRow("rotation", src, out)
+        return DiffRowData("rotation", src, out)
     }
 
-    fun videoRow(): DiffRow {
+    fun videoRow(): DiffRowData {
         fun codec(probe: MediaProbe) = buildString {
             append(probe.videoMime ?: "—")
             if (probe.videoWidth != null && probe.videoHeight != null) {
                 append(" · ${probe.videoWidth}×${probe.videoHeight}")
             }
         }
-        return DiffRow("video", codec(sourceProbe), codec(outputProbe))
+        return DiffRowData("video", codec(sourceProbe), codec(outputProbe))
     }
 
-    val curatedRows: List<DiffRow> = buildList {
+    val curatedRows: List<DiffRowData> = buildList {
         add(creationTimeRow())
         add(locationRow())
+        add(locationRepresentationRow())
         add(rotationRow())
         add(videoRow())
         comTagKeys.forEach { key ->
-            add(DiffRow(key, sourceTags[key] ?: "—", outputTags[key] ?: "—"))
+            add(DiffRowData(key, sourceTags[key] ?: "—", outputTags[key] ?: "—"))
         }
     }
 
-    val remainingRows: List<DiffRow> = remainingKeys.map { key ->
-        DiffRow(key, sourceTags[key] ?: "—", outputTags[key] ?: "—")
+    val remainingRows: List<DiffRowData> = remainingKeys.map { key ->
+        val sourceValue = sourceTags[key]
+        val outputValue = outputTags[key]
+        DiffRowData(
+            key = key,
+            sourceValue = sourceValue ?: "—",
+            outputValue = outputValue ?: "—",
+            // Output-only tags such as FFmpeg's `encoder` tag are allowed additions;
+            // only a missing or changed source tag is a preservation failure.
+            changed = sourceValue != null && sourceValue != outputValue,
+        )
     }
 
     val changedCount = (curatedRows + remainingRows).count { it.changed }
@@ -115,6 +143,16 @@ fun MetadataDiffCard(sourceProbe: MediaProbe, outputProbe: MediaProbe) {
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             // Summary banner
+            val locationRepresentationChanged = curatedRows.any {
+                it.key == "location representation" && it.changed
+            }
+            if (locationRepresentationChanged) {
+                Text(
+                    text = "⚠  Location representation changed; gallery compatibility may be affected",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             val bannerText = if (changedCount == 0) {
                 "✓  All ${curatedRows.size + remainingRows.size} tags preserved"
             } else {

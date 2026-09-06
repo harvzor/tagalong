@@ -172,6 +172,25 @@ class E2eCutTest {
             "$label creation_time must match source ($srcCreation vs $outCreation)",
             srcCreation == outCreation,
         )
+
+        // FFprobe normalizes QuickTime and generic location representations to the same
+        // logical value, so the saved MediaStore bytes need a raw representation assertion too.
+        if (sourceProbe.locationRepresentation.hasQuickTime) {
+            assertTrue(
+                "$label output is missing the source QuickTime ©xyz representation",
+                outputProbe.locationRepresentation.hasQuickTime,
+            )
+            assertTrue(
+                "$label output changed the source QuickTime ©xyz payload",
+                sourceProbe.locationRepresentation.quickTimePayloadsEqual(outputProbe.locationRepresentation),
+            )
+        }
+        assertTrue(
+            "$label output lost a generic mdta location entry",
+            outputProbe.locationRepresentation.genericMdtaKeys.containsAll(
+                sourceProbe.locationRepresentation.genericMdtaKeys,
+            ),
+        )
     }
 
     private fun cleanupSample(sample: TestSamples.SampleVideo) {

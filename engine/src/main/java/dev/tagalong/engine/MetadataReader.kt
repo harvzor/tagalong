@@ -12,6 +12,7 @@ data class MediaProbe(
     val formatTags: Map<String, String>,
     val videoStreamTags: Map<String, String>,
     val audioStreamTags: Map<String, String>,
+    val locationRepresentation: LocationRepresentationInfo,
     val videoRotationDegrees: Int?,
     val videoMime: String?,
     val audioMime: String?,
@@ -45,6 +46,10 @@ object MetadataReader {
             formatTags = info.tags.toStringMap(),
             videoStreamTags = videoStream?.tags.toStringMap(),
             audioStreamTags = audioStream?.tags.toStringMap(),
+            // FFprobe intentionally remains the source for normalized tags. The box walker
+            // adds only the representation provenance that FFprobe flattens away.
+            locationRepresentation = runCatching { Mp4LocationMetadata.inspect(file) }
+                .getOrDefault(LocationRepresentationInfo()),
             videoRotationDegrees = readRotationViaMediaMetadataRetriever(file),
             videoMime = readTrackMime(file, video = true),
             audioMime = readTrackMime(file, video = false),

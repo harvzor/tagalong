@@ -1,12 +1,14 @@
 package dev.tagalong.engine
 
 import android.content.Context
+import android.media.MediaExtractor
 import android.util.Log
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.nio.ByteBuffer
 import java.time.Instant
 
 /**
@@ -77,6 +79,7 @@ abstract class CutEngineContractTest {
         )
 
         val outputProbe = MetadataReader.probe(output)
+        assertReadableMediaSamples(output, label)
         Log.i(TAG, "[$label] source tags=${sourceProbe.formatTags} output tags=${outputProbe.formatTags}")
 
         // Requirement: Lossless cut preserves all source file-level metadata.
@@ -90,6 +93,25 @@ abstract class CutEngineContractTest {
         // Requirement: Creation date and location are retained.
         assertEquals("[$label] creation_time", sourceProbe.formatTags["creation_time"], outputProbe.formatTags["creation_time"])
         assertEquals("[$label] location", sourceProbe.formatTags["location"], outputProbe.formatTags["location"])
+
+        // FFprobe normalizes QuickTime and generic metadata to the same logical key. The
+        // raw representation is a separate preservation-critical assertion.
+        if (sourceProbe.locationRepresentation.hasQuickTime) {
+            assertTrue(
+                "[$label] QuickTime ©xyz representation is missing from output",
+                outputProbe.locationRepresentation.hasQuickTime,
+            )
+            assertTrue(
+                "[$label] QuickTime ©xyz payload changed",
+                sourceProbe.locationRepresentation.quickTimePayloadsEqual(outputProbe.locationRepresentation),
+            )
+        }
+        assertTrue(
+            "[$label] generic mdta location entries were lost",
+            outputProbe.locationRepresentation.genericMdtaKeys.containsAll(
+                sourceProbe.locationRepresentation.genericMdtaKeys,
+            ),
+        )
 
         // Requirement: Orientation is preserved as a signal, not baked into frames.
         assertEquals("[$label] rotation signal", sourceProbe.videoRotationDegrees, outputProbe.videoRotationDegrees)
@@ -116,6 +138,24 @@ abstract class CutEngineContractTest {
             captureTimeMillis,
             saveResult.dateTakenMillis,
         )
+    }
+
+    private fun assertReadableMediaSamples(file: File, label: String) {
+        val extractor = MediaExtractor()
+        try {
+            extractor.setDataSource(file.absolutePath)
+            assertTrue("[$label] output must contain at least one media track", extractor.trackCount > 0)
+            for (track in 0 until extractor.trackCount) {
+                val mime = extractor.getTrackFormat(track).getString("mime") ?: continue
+                if (!mime.startsWith("video/") && !mime.startsWith("audio/")) continue
+                extractor.selectTrack(track)
+                val sampleSize = extractor.readSampleData(ByteBuffer.allocate(2 * 1024 * 1024), 0)
+                assertTrue("[$label] $mime track must expose a media sample", sampleSize > 0)
+                extractor.unselectTrack(track)
+            }
+        } finally {
+            extractor.release()
+        }
     }
 
     private fun cutInterval(sourceProbe: MediaProbe, label: String): Pair<Long, Long> {
