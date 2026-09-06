@@ -48,7 +48,7 @@ These are **hard constraints** — violating them causes build errors, not warni
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
 ```
 
-Test fixture: `fixtures/xiaomi-poco-x5.mp4` (repo root). Each module carries its own copy under `src/androidTest/assets/` — that's what `TestFixtures.kt` reads. The `fixtures/` file is the human-readable/`ffprobe`-accessible original.
+Test corpus: `sample-videos/` (repo root) is the canonical source for device-originated samples, including `xiaomi-poco-x5.mp4` and `google-pixel-10a.mp4`. Both active modules package this directory as their `androidTest` assets; there are no module-local copies. Instrumented tests discover every supported sample automatically, so adding a video here expands the engine and app metadata-preservation matrix without a test-source registration change. The repository files remain human-readable and `ffprobe`-accessible.
 
 ---
 

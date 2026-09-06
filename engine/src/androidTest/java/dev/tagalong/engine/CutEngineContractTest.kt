@@ -18,23 +18,17 @@ import java.time.Instant
 abstract class CutEngineContractTest {
     companion object {
         private const val TAG = "CutEngineContract"
-        private const val START_MS = 500L
-        private const val DURATION_MS = 3000L
     }
 
     abstract fun engine(): CutEngine
 
     private lateinit var context: Context
-    private lateinit var source: File
-    private lateinit var sourceProbe: MediaProbe
-    private lateinit var sourceHashBefore: String
+    private lateinit var samples: List<TestFixtures.SampleVideo>
 
     @Before
     fun setUp() {
         context = TestFixtures.appContext()
-        source = TestFixtures.sourceFile(context)
-        sourceProbe = MetadataReader.probe(source)
-        sourceHashBefore = FileAssertions.sha256(source)
+        samples = TestFixtures.samples(context)
     }
 
     @Test
@@ -45,10 +39,35 @@ abstract class CutEngineContractTest {
 
     private fun runContract(mode: CutMode) {
         val engine = engine()
-        val label = "${engine.name}/$mode"
-        val output = TestFixtures.outputFile(context, "${engine.name}-${mode.name.lowercase()}.mp4")
+        val failures = mutableListOf<String>()
 
-        engine.cut(mode, source, startMs = START_MS, durationMs = DURATION_MS, output = output)
+        for (sample in samples) {
+            runCatching { runContractForSample(engine, sample, mode) }
+                .onFailure { failure ->
+                    failures += "${sample.fileName}: ${failure.message ?: failure::class.java.simpleName}"
+                    Log.e(TAG, "[${engine.name}/${sample.fileName}/$mode] contract failed", failure)
+                }
+        }
+
+        assertTrue(
+            "[${engine.name}/$mode] sample contract failures: ${failures.joinToString("; ")}",
+            failures.isEmpty(),
+        )
+    }
+
+    private fun runContractForSample(
+        engine: CutEngine,
+        sample: TestFixtures.SampleVideo,
+        mode: CutMode,
+    ) {
+        val label = "${engine.name}/${sample.fileName}/$mode"
+        val source = TestFixtures.sourceFile(sample, context)
+        val sourceProbe = MetadataReader.probe(source)
+        val sourceHashBefore = FileAssertions.sha256(source)
+        val (startMs, durationMs) = cutInterval(sourceProbe, label)
+        val output = TestFixtures.outputFile(sample, mode, engine.name, context).apply { delete() }
+
+        engine.cut(mode, source, startMs = startMs, durationMs = durationMs, output = output)
 
         // Requirement: The original file is never modified.
         assertTrue("[$label] output must exist and be distinct from source", output.exists() && output != source)
@@ -82,9 +101,32 @@ abstract class CutEngineContractTest {
 
         // Requirement: Gallery date is preserved.
         val captureTimeMillis = Instant.parse(
-            requireNotNull(sourceProbe.formatTags["creation_time"]) { "source has no creation_time" }
+            requireNotNull(sourceProbe.formatTags["creation_time"]) {
+                "[$label] source has no creation_time"
+            }
         ).toEpochMilli()
-        val saveResult = DateTakenStore.registerAndReadBack(context, output, captureTimeMillis)
-        assertEquals("[$label] MediaStore.DATE_TAKEN must equal source capture date", captureTimeMillis, saveResult.dateTakenMillis)
+        val saveResult = DateTakenStore.registerAndReadBack(
+            context,
+            output,
+            captureTimeMillis,
+            displayName = "${sample.fileName}-${mode.name.lowercase()}-gallery.mp4",
+        )
+        assertEquals(
+            "[$label] MediaStore.DATE_TAKEN must equal source capture date",
+            captureTimeMillis,
+            saveResult.dateTakenMillis,
+        )
+    }
+
+    private fun cutInterval(sourceProbe: MediaProbe, label: String): Pair<Long, Long> {
+        val sourceDurationMs = requireNotNull(sourceProbe.durationMs) {
+            "[$label] source duration is unavailable; cannot derive a valid cut interval"
+        }
+        val startMs = minOf(500L, sourceDurationMs / 4)
+        val durationMs = minOf(3000L, sourceDurationMs - startMs)
+        require(startMs > 0L && durationMs > 0L && startMs + durationMs <= sourceDurationMs) {
+            "[$label] source duration ${sourceDurationMs}ms cannot provide a valid cut interval"
+        }
+        return startMs to durationMs
     }
 }

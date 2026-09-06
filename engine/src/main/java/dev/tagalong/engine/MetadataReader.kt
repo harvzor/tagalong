@@ -17,6 +17,7 @@ data class MediaProbe(
     val audioMime: String?,
     val videoWidth: Int?,
     val videoHeight: Int?,
+    val durationMs: Long?,
 )
 
 /**
@@ -49,6 +50,7 @@ object MetadataReader {
             audioMime = readTrackMime(file, video = false),
             videoWidth = videoStream?.width?.toInt(),
             videoHeight = videoStream?.height?.toInt(),
+            durationMs = readDurationMs(file),
         )
     }
 
@@ -63,6 +65,16 @@ object MetadataReader {
         val map = LinkedHashMap<String, String>()
         keys().forEach { key -> map[key] = optString(key) }
         return map
+    }
+
+    private fun readDurationMs(file: File): Long? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(file.absolutePath)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+        } finally {
+            retriever.release()
+        }
     }
 
     /** Public-API rotation signal — same source for both source and output, so any sign/scale

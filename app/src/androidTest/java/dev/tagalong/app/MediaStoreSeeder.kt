@@ -8,7 +8,7 @@ import android.os.Environment
 import android.provider.MediaStore
 
 /**
- * Inserts and removes fixture videos from MediaStore for instrumented tests.
+ * Inserts and removes sample videos from MediaStore for instrumented tests.
  * Uses [MediaStore.VOLUME_EXTERNAL_PRIMARY] so the picker sees items immediately
  * (ContentResolver.insert is synchronous — no media-scan delay).
  */
@@ -19,15 +19,19 @@ object MediaStoreSeeder {
      * Deletes any pre-existing entry with the same display name first so there is exactly one copy.
      *
      * @param context Used for [ContentResolver] operations (typically `targetContext`).
-     * @param assetName Name of the asset file (e.g. `"xiaomi-poco-x5.mp4"`).
+     * @param assetName Name of the discovered sample asset (e.g. `"xiaomi-poco-x5.mp4"`).
      * @param assetContext Context whose [android.content.res.AssetManager] holds the asset.
      *   Assets in `androidTest/assets/` live in the instrumentation APK, so pass
      *   `InstrumentationRegistry.getInstrumentation().context` here.
      *   Defaults to [context] when the asset and content resolver share the same APK.
      */
     fun insert(context: Context, assetName: String, assetContext: Context = context): Uri {
-        // Clean up any stale copy from a previous run
-        findByDisplayName(context, assetName)?.let { stale -> delete(context, stale) }
+        // Clean up every stale copy from a previous run. A failed test can leave more than
+        // one row with the same display name, and DocumentsUI must never see an ambiguous seed.
+        while (true) {
+            val stale = findByDisplayName(context, assetName) ?: break
+            delete(context, stale)
+        }
 
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, assetName)
@@ -76,6 +80,34 @@ object MediaStoreSeeder {
             }
         }
         return null
+    }
+
+    /** Returns every video whose display name contains [nameSubstring]. */
+    fun findByDisplayNameContains(context: Context, nameSubstring: String): List<Uri> {
+        val matches = mutableListOf<Uri>()
+        val projection = arrayOf(MediaStore.Video.Media._ID)
+        val selection = "${MediaStore.Video.Media.DISPLAY_NAME} LIKE ?"
+        context.contentResolver.query(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            selection,
+            arrayOf("%$nameSubstring%"),
+            null,
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+            while (cursor.moveToNext()) {
+                matches += ContentUris.withAppendedId(
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    cursor.getLong(idColumn),
+                )
+            }
+        }
+        return matches
+    }
+
+    /** Deletes all matching display-name rows, including stale rows from an interrupted test. */
+    fun deleteByDisplayNameContains(context: Context, nameSubstring: String) {
+        delete(context, *findByDisplayNameContains(context, nameSubstring).toTypedArray())
     }
 
     /**

@@ -2,12 +2,12 @@
 
 set -euo pipefail
 
-# Push repository video fixtures into the emulator's public DCIM directory and
+# Push repository sample videos into the emulator's public DCIM directory and
 # ask Android to index them so they appear in Gallery and ACTION_OPEN_DOCUMENT.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-FIXTURES_DIR="${FIXTURES_DIR:-$REPO_ROOT/fixtures}"
+FIXTURES_DIR="${FIXTURES_DIR:-$REPO_ROOT/sample-videos}"
 REMOTE_DIR="${REMOTE_DIR:-/sdcard/DCIM}"
 
 find_adb() {
@@ -38,7 +38,7 @@ if [[ -z "$ADB_BIN" ]]; then
 fi
 
 # Use ANDROID_SERIAL when supplied. Otherwise require exactly one connected device
-# so a fixture cannot accidentally be pushed to the wrong emulator or phone.
+# so a sample cannot accidentally be pushed to the wrong emulator or phone.
 ADB_ARGS=()
 if [[ -n "${ANDROID_SERIAL:-}" ]]; then
     ADB_ARGS=(-s "$ANDROID_SERIAL")
@@ -74,33 +74,33 @@ adb() {
 }
 
 if [[ ! -d "$FIXTURES_DIR" ]]; then
-    echo "Error: fixture directory does not exist: $FIXTURES_DIR" >&2
+    echo "Error: sample-video directory does not exist: $FIXTURES_DIR" >&2
     exit 1
 fi
 
-# Keep this list explicit so unrelated files in fixtures/ are not copied.
-fixture_files=()
+# Keep this list explicit so unrelated files in sample-videos/ are not copied.
+sample_files=()
 while IFS= read -r -d '' fixture; do
-    fixture_files+=("$fixture")
+    sample_files+=("$fixture")
 done < <(
     find "$FIXTURES_DIR" -maxdepth 1 -type f \
         \( -iname '*.mp4' -o -iname '*.mov' -o -iname '*.m4v' -o -iname '*.3gp' -o -iname '*.webm' -o -iname '*.mkv' \) \
         -print0
 )
 
-if [[ "${#fixture_files[@]}" -eq 0 ]]; then
-    echo "Error: no supported video fixtures found in $FIXTURES_DIR" >&2
+if [[ "${#sample_files[@]}" -eq 0 ]]; then
+    echo "Error: no supported sample videos found in $FIXTURES_DIR" >&2
     exit 1
 fi
 
 adb shell mkdir -p "$REMOTE_DIR"
 
-for fixture in "${fixture_files[@]}"; do
-    filename="$(basename "$fixture")"
+for sample in "${sample_files[@]}"; do
+    filename="$(basename "$sample")"
     remote_path="$REMOTE_DIR/$filename"
 
-    echo "Pushing $fixture -> $remote_path"
-    adb push "$fixture" "$remote_path"
+    echo "Pushing $sample -> $remote_path"
+    adb push "$sample" "$remote_path"
 
     echo "Indexing $filename"
     adb shell am broadcast \
@@ -108,4 +108,4 @@ for fixture in "${fixture_files[@]}"; do
         -d "file://$remote_path" >/dev/null
 done
 
-echo "Done. ${#fixture_files[@]} fixture video(s) are in $REMOTE_DIR."
+echo "Done. ${#sample_files[@]} sample video(s) are in $REMOTE_DIR."
