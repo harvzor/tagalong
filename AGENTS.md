@@ -30,22 +30,31 @@ These are **hard constraints** — violating them causes build errors, not warni
 
 - **Do not add `org.jetbrains.kotlin.android` to any `plugins {}` block.** AGP 9+ bundles Kotlin support; adding the plugin is a fatal build error.
 - **Do not add `kotlinOptions {}` blocks.** Use `compileOptions.sourceCompatibility`/`targetCompatibility` only.
-- **Entry point:** `./gradlew.bat` (Gradle 9.5.0, wrapper committed, no separate install needed)
+- **Entry point:** `./gradlew` (macOS/Linux) or `.\gradlew.bat` (Windows PowerShell). Gradle 9.5.0, wrapper committed, no separate install needed
 - **Default branch:** `master` (not `main`)
-- **`local.properties`** is gitignored. Recreate if missing: `sdk.dir=C:\\Users\\rv\\AppData\\Local\\Android\\Sdk`
+- **`local.properties`** is gitignored. Create it with `sdk.dir` set to your own Android SDK root — typically `%LOCALAPPDATA%\Android\Sdk` on Windows, `~/Library/Android/sdk` on macOS. Java properties files expand nothing, so write the path out literally, e.g. `sdk.dir=C\:\\Users\\you\\AppData\\Local\\Android\\Sdk`
 
 ---
 
 ## Build & test
 
-```powershell
-# Run instrumented (on-device) tests for :engine
-./gradlew.bat :engine:connectedAndroidTest
+An emulator or device must be running before the instrumented suites; README's *Instrumented tests* section names the verified AVD image. The commands below assume one is already up.
 
-# Boot the AVD first if needed
-& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Pixel_7_API_34 -no-snapshot -gpu swiftshader_indirect
-# Confirm it's up
-& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
+```powershell
+# Windows PowerShell
+.\gradlew.bat :engine:connectedAndroidTest
+```
+
+```bash
+# macOS / Linux
+./gradlew :engine:connectedAndroidTest
+```
+
+Confirm whatever you started is visible:
+
+```bash
+adb devices
+adb -s emulator-5554 emu avd name
 ```
 
 Test corpus: `sample-videos/` (repo root) is the canonical source for device-originated samples, including `xiaomi-poco-x5.mp4` and `google-pixel-10a.mp4`. Both active modules package this directory as their `androidTest` assets; there are no module-local copies. Instrumented tests discover every supported sample automatically, so adding a video here expands the engine and app metadata-preservation matrix without a test-source registration change. The repository files remain human-readable and `ffprobe`-accessible.
@@ -108,7 +117,7 @@ Key commands: `openspec new change "<name>"`, `openspec status --change "<name>"
 | 2 | Mode toggle + re-encode | 🔲 Next |
 | 3 | Keyframe-snap caveat, error states, polish | 🔲 Later |
 
-Step 1 was verified end-to-end on the `Pixel_7_API_34` emulator: gallery date matched source `creation_time`, source bytes unchanged, portrait rotation signal survived, HEVC/mp4 processed cleanly.
+Step 1 was verified end-to-end on the `Pixel_7_API_34` emulator: gallery date matched source `creation_time`, source bytes unchanged, portrait rotation signal survived, HEVC/mp4 processed cleanly. Verification has since moved to the `Medium_Phone` AVD (Android 17 / API 37) named in README's *Instrumented tests* section.
 
 The picker was subsequently switched from `PickVisualMedia` to `ACTION_OPEN_DOCUMENT` (change `switch-picker-to-open-document`, 2026-08-19): GPS location tags, real `DISPLAY_NAME`, and `RELATIVE_PATH` are now all preserved end-to-end without permission workarounds. Verified by `E2eCutTest` and manual `ffprobe` on cut output.
 
