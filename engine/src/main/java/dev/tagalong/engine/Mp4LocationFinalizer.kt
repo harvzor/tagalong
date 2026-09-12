@@ -1,7 +1,12 @@
 package dev.tagalong.engine
 
 import java.io.File
+import java.io.RandomAccessFile
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
+import java.nio.channels.FileChannel
 
 /** Raised when a cut output is not a layout this narrow metadata writer can prove safe. */
 class UnsupportedMp4LayoutException(message: String) : IllegalStateException(message)
@@ -13,136 +18,211 @@ class UnsupportedMp4LayoutException(message: String) : IllegalStateException(mes
  * finalizer restores the source `moov/udta/©xyz` bytes without reserializing coordinates or
  * touching encoded media packets. It is deliberately narrow: unsupported or ambiguous MP4
  * layouts fail instead of producing an output whose offsets cannot be trusted.
+ *
+ * The rewrite is streaming and memory stays flat regardless of file size — no stage ever
+ * buffers a whole file, and file positions are [Long] throughout, so outputs beyond 2 GB
+ * (routine for 4K recordings) are addressable:
+ *
+ * 1. a seekable descriptor pass walks the output's box tree;
+ * 2. a stream-splice copy moves output → temp through [FileChannel], inserting the raw
+ *    source `©xyz` bytes at the splice point;
+ * 3. a patch pass fixes, in place in the temp file, only the fixed-width fields the size
+ *    delta invalidates: enclosing box sizes and `stco`/`co64` chunk offsets;
+ * 4. self-verification re-inspects the temp file before it replaces the output.
+ *
+ * Unsupported-layout failures and the temp-file-and-swap installation semantics are
+ * unchanged from the original whole-file implementation.
  */
 object Mp4LocationFinalizer {
 
+    private const val TRANSFER_CHUNK = 1L shl 22 // 4 MiB per channel transfer.
+
     fun preserve(source: File, output: File) {
         require(source.absoluteFile != output.absoluteFile) { "Source and output must be different files" }
-        val sourceBytes = source.readBytes()
-        val sourceInfo = Mp4LocationMetadata.inspect(sourceBytes)
+        val sourceInfo = Mp4LocationMetadata.inspect(source)
         if (!sourceInfo.hasQuickTime) return
 
-        val outputBytes = output.readBytes()
-        val root = Mp4LocationMetadata.parseBoxes(outputBytes, 0, outputBytes.size)
-        requireNoFragments(root, outputBytes)
-        val moovs = root.filter { it.type == "moov" }
-        if (moovs.size != 1) {
-            throw UnsupportedMp4LayoutException("Expected exactly one output moov box, found ${moovs.size}")
-        }
-        val moov = moovs.single()
-        val moovChildren = Mp4LocationMetadata.childrenOf(moov, outputBytes)
-        val udtas = moovChildren.filter { it.type == "udta" }
-        if (udtas.size > 1) {
-            throw UnsupportedMp4LayoutException("Output contains multiple moov/udta boxes")
-        }
-
-        val sourceBoxes = sourceInfo.quickTimeLocations.map { it.boxBytes }
-        val udta = udtas.singleOrNull()
-        val existingBoxes = udta?.let { parent ->
-            Mp4LocationMetadata.childrenOf(parent, outputBytes).filter { it.type == "©xyz" }
-        }.orEmpty()
-
-        // Avoid rewriting an already-correct output. This also prevents duplicate location
-        // atoms if a future FFmpeg build learns to emit the QuickTime form itself.
-        val existingInfo = runCatching { Mp4LocationMetadata.inspect(outputBytes) }.getOrNull()
-        if (existingInfo != null && existingInfo.quickTimePayloadsEqual(sourceInfo)) return
-
-        val replacement = concatenate(sourceBoxes)
-        val changeStart: Int
-        val changeEnd: Int
-        val replacementBytes: ByteArray
-        if (existingBoxes.isNotEmpty()) {
-            val first = existingBoxes.first()
-            val last = existingBoxes.last()
-            val directChildren = Mp4LocationMetadata.childrenOf(requireNotNull(udta), outputBytes)
-            val firstIndex = directChildren.indexOf(first)
-            val lastIndex = directChildren.indexOf(last)
-            if (firstIndex < 0 || lastIndex < firstIndex ||
-                directChildren.subList(firstIndex, lastIndex + 1).any { it.type != "©xyz" }
-            ) {
-                throw UnsupportedMp4LayoutException("Output QuickTime location boxes are not contiguous")
+        val outputSource = Mp4FileByteSource(output)
+        try {
+            val root = Mp4LocationMetadata.parseBoxes(outputSource, 0, outputSource.size)
+            requireNoFragments(outputSource, root)
+            val moovs = root.filter { it.type == "moov" }
+            if (moovs.size != 1) {
+                throw UnsupportedMp4LayoutException("Expected exactly one output moov box, found ${moovs.size}")
             }
-            changeStart = first.start
-            changeEnd = last.end
-            replacementBytes = replacement
-        } else if (udta != null) {
-            changeStart = udta.end
-            changeEnd = udta.end
-            replacementBytes = replacement
-        } else {
-            // FFmpeg normally creates udta for MP4 metadata. Supporting its absence is
-            // inexpensive and keeps the finalizer valid for minimal MP4 outputs.
-            changeStart = moov.end
-            changeEnd = moov.end
-            replacementBytes = standardBox("udta", replacement)
-        }
+            val moov = moovs.single()
+            val moovChildren = Mp4LocationMetadata.childrenOf(outputSource, moov)
+            val udtas = moovChildren.filter { it.type == "udta" }
+            if (udtas.size > 1) {
+                throw UnsupportedMp4LayoutException("Output contains multiple moov/udta boxes")
+            }
 
-        val delta = replacementBytes.size.toLong() - (changeEnd - changeStart).toLong()
-        val rewritten = replaceRange(outputBytes, changeStart, changeEnd, replacementBytes)
-        updateAncestorSizes(
-            rewritten,
-            ancestors = listOfNotNull(udta, moov),
-            changeEnd = changeEnd,
-            delta = delta,
-        )
-        updateChunkOffsets(rewritten, root, outputBytes, changeStart, changeEnd, delta)
+            val udta = udtas.singleOrNull()
+            val existingBoxes = udta?.let { parent ->
+                Mp4LocationMetadata.childrenOf(outputSource, parent).filter { it.type == "©xyz" }
+            }.orEmpty()
 
-        val rewrittenInfo = Mp4LocationMetadata.inspect(rewritten)
-        if (!rewrittenInfo.quickTimePayloadsEqual(sourceInfo)) {
-            throw UnsupportedMp4LayoutException(
-                "Finalized output did not retain the source ©xyz payload " +
-                    "(source boxes=${sourceInfo.quickTimeLocations.size}, " +
-                    "output boxes=${rewrittenInfo.quickTimeLocations.size})",
-            )
+            // Avoid rewriting an already-correct output. This also prevents duplicate location
+            // atoms if a future FFmpeg build learns to emit the QuickTime form itself.
+            val existingInfo = runCatching { Mp4LocationMetadata.inspect(outputSource) }.getOrNull()
+            if (existingInfo != null && existingInfo.quickTimePayloadsEqual(sourceInfo)) return
+
+            val replacement = concatenate(sourceInfo.quickTimeLocations.map { it.boxBytes })
+            val changeStart: Long
+            val changeEnd: Long
+            val replacementBytes: ByteArray
+            if (existingBoxes.isNotEmpty()) {
+                val first = existingBoxes.first()
+                val last = existingBoxes.last()
+                val directChildren = Mp4LocationMetadata.childrenOf(outputSource, requireNotNull(udta))
+                val firstIndex = directChildren.indexOf(first)
+                val lastIndex = directChildren.indexOf(last)
+                if (firstIndex < 0 || lastIndex < firstIndex ||
+                    directChildren.subList(firstIndex, lastIndex + 1).any { it.type != "©xyz" }
+                ) {
+                    throw UnsupportedMp4LayoutException("Output QuickTime location boxes are not contiguous")
+                }
+                changeStart = first.start
+                changeEnd = last.end
+                replacementBytes = replacement
+            } else if (udta != null) {
+                changeStart = udta.end
+                changeEnd = udta.end
+                replacementBytes = replacement
+            } else {
+                // FFmpeg normally creates udta for MP4 metadata. Supporting its absence is
+                // inexpensive and keeps the finalizer valid for minimal MP4 outputs.
+                changeStart = moov.end
+                changeEnd = moov.end
+                replacementBytes = standardBox("udta", replacement)
+            }
+
+            val delta = replacementBytes.size.toLong() - (changeEnd - changeStart)
+            val parent = output.parentFile
+                ?: throw UnsupportedMp4LayoutException("Output has no parent directory")
+            if (!parent.exists() && !parent.mkdirs()) {
+                throw UnsupportedMp4LayoutException("Could not create output directory ${parent.absolutePath}")
+            }
+            val temporary = File(parent, ".${output.name}.xyz-${System.nanoTime()}.tmp")
+            try {
+                streamSplice(output, temporary, changeStart, changeEnd, replacementBytes)
+                if (delta != 0L) {
+                    RandomAccessFile(temporary, "rw").use { patch ->
+                        updateAncestorSizes(
+                            patch,
+                            ancestors = listOfNotNull(udta, moov),
+                            changeEnd = changeEnd,
+                            delta = delta,
+                        )
+                        updateChunkOffsets(patch, outputSource, root, changeStart, changeEnd, delta)
+                    }
+                }
+
+                val rewrittenInfo = Mp4LocationMetadata.inspect(temporary)
+                if (!rewrittenInfo.quickTimePayloadsEqual(sourceInfo)) {
+                    throw UnsupportedMp4LayoutException(
+                        "Finalized output did not retain the source ©xyz payload " +
+                            "(source boxes=${sourceInfo.quickTimeLocations.size}, " +
+                            "output boxes=${rewrittenInfo.quickTimeLocations.size})",
+                    )
+                }
+                install(temporary, output)
+            } finally {
+                temporary.delete()
+            }
+        } finally {
+            outputSource.close()
         }
-        writeReplacement(output, rewritten)
+    }
+
+    /**
+     * Copies [original] to [temporary] through file channels, skipping the
+     * `[changeStart, changeEnd)` range and inserting [replacement] in its place.
+     * Memory use is one transfer chunk regardless of file size.
+     */
+    private fun streamSplice(
+        original: File,
+        temporary: File,
+        changeStart: Long,
+        changeEnd: Long,
+        replacement: ByteArray,
+    ) {
+        FileChannel.open(original.toPath(), StandardOpenOption.READ).use { input ->
+            FileChannel.open(
+                temporary.toPath(),
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+            ).use { target ->
+                copyRange(input, target, 0L, changeStart)
+                var buffer = ByteBuffer.wrap(replacement)
+                while (buffer.hasRemaining()) {
+                    if (target.write(buffer) <= 0) {
+                        throw UnsupportedMp4LayoutException("Could not write replacement location bytes")
+                    }
+                }
+                copyRange(input, target, changeEnd, input.size())
+            }
+        }
+    }
+
+    private fun copyRange(input: FileChannel, target: FileChannel, from: Long, to: Long) {
+        var position = from
+        while (position < to) {
+            val remaining = to - position
+            // transferTo reports its own source position argument as absolute and may
+            // write fewer bytes than requested; loop until the region is fully copied.
+            val transferred = input.transferTo(position, minOf(TRANSFER_CHUNK, remaining), target)
+            if (transferred <= 0L) {
+                throw UnsupportedMp4LayoutException("MP4 copy-through stalled at offset $position")
+            }
+            position += transferred
+        }
     }
 
     private fun requireNoFragments(
+        source: Mp4ByteSource,
         boxes: List<Mp4LocationMetadata.Mp4Box>,
-        bytes: ByteArray,
     ) {
         fun visit(box: Mp4LocationMetadata.Mp4Box) {
             if (box.type == "moof" || box.type == "mfra") {
                 throw UnsupportedMp4LayoutException("Fragmented MP4 layouts are not supported")
             }
-            Mp4LocationMetadata.childrenOf(box, bytes).forEach(::visit)
+            Mp4LocationMetadata.childrenOf(source, box).forEach(::visit)
         }
         boxes.forEach(::visit)
     }
 
     private fun updateAncestorSizes(
-        bytes: ByteArray,
+        patch: RandomAccessFile,
         ancestors: List<Mp4LocationMetadata.Mp4Box>,
-        changeEnd: Int,
+        changeEnd: Long,
         delta: Long,
     ) {
-        if (delta == 0L) return
         ancestors.forEach { box ->
-            val newSize = (box.end - box.start).toLong() + delta
+            val newSize = (box.end - box.start) + delta
             val newStart = shiftedPosition(box.start, changeEnd, delta)
-            writeBoxSize(bytes, newStart, box.headerSize, newSize)
+            writeBoxSize(patch, newStart, box.headerSize, newSize)
         }
     }
 
     private fun updateChunkOffsets(
-        bytes: ByteArray,
+        patch: RandomAccessFile,
+        original: Mp4ByteSource,
         originalRoot: List<Mp4LocationMetadata.Mp4Box>,
-        originalBytes: ByteArray,
-        changeStart: Int,
-        changeEnd: Int,
+        changeStart: Long,
+        changeEnd: Long,
         delta: Long,
     ) {
-        if (delta == 0L) return
-        // The original tree and bytes provide stable positions and values; [bytes] is the
-        // rewritten output into which adjusted entries are written.
-        allBoxes(originalRoot, originalBytes).forEach { box ->
+        // Chunk offsets are the only absolute file positions inside a non-fragmented MP4.
+        // Values are read from the untouched original file and written, adjusted, into the
+        // spliced temp file at each box's post-splice position.
+        allBoxes(original, originalRoot).forEach { box ->
             if (box.type != "stco" && box.type != "co64") return@forEach
             val entryCountOffset = box.payloadStart + 4
             if (entryCountOffset + 4 > box.end) {
                 throw UnsupportedMp4LayoutException("Truncated ${box.type} box")
             }
-            val count = Mp4LocationMetadata.readUInt32(originalBytes, entryCountOffset)
+            val count = original.readUInt32(entryCountOffset)
             if (count > Int.MAX_VALUE) {
                 throw UnsupportedMp4LayoutException("${box.type} entry count is too large")
             }
@@ -155,16 +235,15 @@ object Mp4LocationFinalizer {
             val entriesStart = boxNewStart + (box.payloadStart - box.start) + 8
             repeat(count.toInt()) { index ->
                 val oldOffset = box.payloadStart + 8 + index * entrySize
-                val newOffset = entriesStart + index * entrySize
                 val value = if (entrySize == 4) {
-                    Mp4LocationMetadata.readUInt32(originalBytes, oldOffset)
+                    original.readUInt32(oldOffset)
                 } else {
-                    Mp4LocationMetadata.readUInt64(originalBytes, oldOffset)
+                    original.readUInt64(oldOffset)
                 }
-                if (value in changeStart.toLong() until changeEnd.toLong()) {
+                if (value in changeStart until changeEnd) {
                     throw UnsupportedMp4LayoutException("${box.type} points into the rewritten MP4 range")
                 }
-                if (value >= changeEnd.toLong()) {
+                if (value >= changeEnd) {
                     val adjusted = value + delta
                     if (adjusted < 0L) {
                         throw UnsupportedMp4LayoutException("${box.type} offset became negative")
@@ -172,63 +251,49 @@ object Mp4LocationFinalizer {
                     if (entrySize == 4 && adjusted > 0xffff_ffffL) {
                         throw UnsupportedMp4LayoutException("stco offset overflow requires co64 conversion")
                     }
-                    if (entrySize == 4) writeUInt32(bytes, newOffset, adjusted)
-                    else writeUInt64(bytes, newOffset, adjusted)
+                    val newOffset = entriesStart + index * entrySize
+                    patch.seek(newOffset)
+                    if (entrySize == 4) {
+                        patch.writeInt(adjusted.toInt())
+                    } else {
+                        patch.writeLong(adjusted)
+                    }
                 }
             }
         }
     }
 
     private fun allBoxes(
+        source: Mp4ByteSource,
         roots: List<Mp4LocationMetadata.Mp4Box>,
-        bytes: ByteArray?,
     ): List<Mp4LocationMetadata.Mp4Box> {
         val result = mutableListOf<Mp4LocationMetadata.Mp4Box>()
         fun visit(box: Mp4LocationMetadata.Mp4Box) {
             result += box
-            if (bytes != null) {
-                Mp4LocationMetadata.childrenOf(box, bytes).forEach(::visit)
-            }
+            Mp4LocationMetadata.childrenOf(source, box).forEach(::visit)
         }
         roots.forEach(::visit)
         return result
     }
 
-    private fun replaceRange(
-        source: ByteArray,
-        start: Int,
-        end: Int,
-        replacement: ByteArray,
-    ): ByteArray {
-        val newLength = source.size.toLong() - (end - start).toLong() + replacement.size
-        if (newLength !in 0..Int.MAX_VALUE) {
-            throw UnsupportedMp4LayoutException("Rewritten MP4 is too large")
-        }
-        return ByteArray(newLength.toInt()).also { output ->
-            source.copyInto(output, 0, 0, start)
-            replacement.copyInto(output, start)
-            source.copyInto(output, start + replacement.size, end, source.size)
-        }
+    private fun shiftedPosition(position: Long, changeEnd: Long, delta: Long): Long {
+        val shifted = position + if (position >= changeEnd) delta else 0L
+        require(shifted >= 0L) { "MP4 position became negative after rewrite" }
+        return shifted
     }
 
-    private fun shiftedPosition(position: Int, changeEnd: Int, delta: Long): Int {
-        val shifted = position.toLong() + if (position >= changeEnd) delta else 0L
-        if (shifted !in 0..Int.MAX_VALUE) {
-            throw UnsupportedMp4LayoutException("MP4 position became out of range")
-        }
-        return shifted.toInt()
-    }
-
-    private fun writeBoxSize(bytes: ByteArray, start: Int, headerSize: Int, size: Long) {
+    private fun writeBoxSize(patch: RandomAccessFile, start: Long, headerSize: Int, size: Long) {
         require(size >= headerSize) { "Invalid rewritten MP4 box size $size" }
+        patch.seek(start)
         if (headerSize == 8) {
             if (size > 0xffff_ffffL) {
                 throw UnsupportedMp4LayoutException("32-bit MP4 box size overflow")
             }
-            writeUInt32(bytes, start, size)
+            patch.writeInt(size.toInt())
         } else {
-            writeUInt32(bytes, start, 1)
-            writeUInt64(bytes, start + 8, size)
+            patch.writeInt(1)
+            patch.seek(start + 8)
+            patch.writeLong(size)
         }
     }
 
@@ -264,29 +329,14 @@ object Mp4LocationFinalizer {
         bytes[offset + 3] = value.toByte()
     }
 
-    private fun writeUInt64(bytes: ByteArray, offset: Int, value: Long) {
-        require(value >= 0L)
-        repeat(8) { index ->
-            bytes[offset + index] = (value ushr ((7 - index) * 8)).toByte()
-        }
-    }
-
-    private fun writeReplacement(output: File, bytes: ByteArray) {
-        val parent = output.parentFile ?: throw UnsupportedMp4LayoutException("Output has no parent directory")
-        if (!parent.exists() && !parent.mkdirs()) {
-            throw UnsupportedMp4LayoutException("Could not create output directory ${parent.absolutePath}")
-        }
-        val temporary = File(parent, ".${output.name}.xyz-${System.nanoTime()}.tmp")
+    /** Replaces the FFmpeg output with the verified temp file, as the original swap did. */
+    private fun install(temporary: File, output: File) {
+        // Files.move with REPLACE_EXISTING covers the delete+rename of the original
+        // implementation in one operation on the same filesystem (cacheDir).
         try {
-            temporary.writeBytes(bytes)
-            if (!output.delete() && output.exists()) {
-                throw UnsupportedMp4LayoutException("Could not replace FFmpeg output ${output.name}")
-            }
-            if (!temporary.renameTo(output)) {
-                throw UnsupportedMp4LayoutException("Could not install finalized output ${output.name}")
-            }
-        } finally {
-            temporary.delete()
+            Files.move(temporary.toPath(), output.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        } catch (failure: java.io.IOException) {
+            throw UnsupportedMp4LayoutException("Could not install finalized output ${output.name}: ${failure.message}")
         }
     }
 }

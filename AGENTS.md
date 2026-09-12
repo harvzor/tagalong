@@ -50,6 +50,14 @@ These are **hard constraints** — violating them causes build errors, not warni
 
 Test corpus: `sample-videos/` (repo root) is the canonical source for device-originated samples, including `xiaomi-poco-x5.mp4` and `google-pixel-10a.mp4`. Both active modules package this directory as their `androidTest` assets; there are no module-local copies. Instrumented tests discover every supported sample automatically, so adding a video here expands the engine and app metadata-preservation matrix without a test-source registration change. The repository files remain human-readable and `ffprobe`-accessible.
 
+Host-side unit tests (`:engine:testDebugUnitTest`) run without an emulator. The `:engine` unit-test JVM is deliberately pinned to `maxHeapSize = "256m"` to simulate the stock Android per-app heap; do not raise it to make a whole-file read pass (see `Mp4LocationHeapBudgetTest`).
+
+### Pre-release manual verification
+
+Before shipping a release, in addition to the automated suites:
+
+- Cut a multi-minute 4K clip (file larger than the app memory class) on the real Pixel 10a and confirm: the cut succeeds, Google Photos shows the location on the saved output, and it plays normally. The emulator corpus is 11–16 MB and cannot exercise the large-file paths.
+
 ---
 
 ## Why the app uses ACTION_OPEN_DOCUMENT instead of the Photo Picker

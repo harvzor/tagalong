@@ -1,7 +1,14 @@
 package dev.tagalong.engine
 
 import java.io.File
+import java.io.RandomAccessFile
 import java.nio.charset.StandardCharsets
+
+/**
+ * Reading a metadata atom larger than this from a file indicates a malformed or
+ * adversarial container; location atoms are tens of bytes in every known writer.
+ */
+private const val MAX_METADATA_ATOM_BYTES = 4 * 1024 * 1024
 
 /**
  * The physical representation of an embedded location in an MP4 file.
@@ -59,14 +66,25 @@ data class QuickTimeLocation(
  * This is intentionally not a general media parser. It understands MP4 box headers,
  * the container boxes needed to reach `moov/udta`, and the `meta`/`keys` structure
  * emitted for generic `mdta` metadata. Unknown boxes are retained as opaque bytes.
+ *
+ * The walker runs against an [Mp4ByteSource] so the same grammar serves in-memory
+ * bytes and whole files. The file-backed [inspect] never buffers the file: box
+ * headers are read a few bytes at a time and only metadata atoms are materialized.
+ * A phone-size video is megabytes of media per gigabyte, so this keeps memory flat
+ * regardless of the cut's size.
  */
 object Mp4LocationMetadata {
 
-    fun inspect(file: File): LocationRepresentationInfo = inspect(file.readBytes())
+    fun inspect(file: File): LocationRepresentationInfo =
+        Mp4FileByteSource(file).use { inspect(it) }
 
     fun inspect(bytes: ByteArray): LocationRepresentationInfo {
         require(bytes.isNotEmpty()) { "Cannot inspect an empty MP4 file" }
-        val root = parseBoxes(bytes, 0, bytes.size)
+        return Mp4ByteArraySource(bytes).use { inspect(it) }
+    }
+
+    internal fun inspect(source: Mp4ByteSource): LocationRepresentationInfo {
+        val root = parseBoxes(source, 0, source.size)
         val quickTime = mutableListOf<QuickTimeLocation>()
         val genericKeys = linkedSetOf<String>()
 
@@ -74,28 +92,28 @@ object Mp4LocationMetadata {
             val currentPath = path + box.type
             if (currentPath.takeLast(3) == listOf("moov", "udta", "©xyz")) {
                 quickTime += QuickTimeLocation(
-                    boxBytes = bytes.copyOfRange(box.start, box.end),
-                    payload = bytes.copyOfRange(box.payloadStart, box.end),
+                    boxBytes = source.readAtom(box.start, (box.end - box.start).toInt()),
+                    payload = source.readAtom(box.payloadStart, (box.end - box.payloadStart).toInt()),
                 )
             }
             if (box.type == "meta") {
-                genericKeys += readLocationKeys(bytes, box)
+                genericKeys += readLocationKeys(source, box)
             }
-            childrenOf(box, bytes).forEach { child -> visit(child, currentPath) }
+            childrenOf(source, box).forEach { child -> visit(child, currentPath) }
         }
 
         root.forEach { visit(it, emptyList()) }
         return LocationRepresentationInfo(quickTime, genericKeys)
     }
 
-    private fun readLocationKeys(bytes: ByteArray, meta: Mp4Box): Set<String> {
+    private fun readLocationKeys(source: Mp4ByteSource, meta: Mp4Box): Set<String> {
         // A meta box is a FullBox: version/flags precede its child boxes.
         if (meta.payloadStart + 4 > meta.end) return emptySet()
-        val children = childrenOf(meta, bytes)
+        val children = childrenOf(source, meta)
         val keys = children.firstOrNull { it.type == "keys" } ?: return emptySet()
         if (keys.payloadStart + 8 > keys.end) return emptySet()
 
-        val entryCount = readUInt32(bytes, keys.payloadStart + 4)
+        val entryCount = source.readUInt32(keys.payloadStart + 4)
         if (entryCount > Int.MAX_VALUE) {
             throw IllegalArgumentException("MP4 keys entry count is too large: $entryCount")
         }
@@ -105,12 +123,15 @@ object Mp4LocationMetadata {
             if (cursor + 8 > keys.end) {
                 throw IllegalArgumentException("Truncated MP4 mdta key entry")
             }
-            val entrySize = readUInt32(bytes, cursor).toIntChecked("mdta key size")
+            val entrySize = source.readUInt32(cursor).toIntChecked("mdta key size")
             if (entrySize < 8 || cursor + entrySize > keys.end) {
                 throw IllegalArgumentException("Invalid MP4 mdta key size: $entrySize")
             }
-            val namespace = decodeType(bytes, cursor + 4)
-            val key = String(bytes, cursor + 8, entrySize - 8, StandardCharsets.UTF_8)
+            val namespace = source.decodeType(cursor + 4)
+            val key = String(
+                source.readAtom(cursor + 8, entrySize - 8),
+                StandardCharsets.UTF_8,
+            )
             if (namespace == "mdta" && (key == "location" || key == "location-eng")) {
                 found += key
             }
@@ -119,70 +140,70 @@ object Mp4LocationMetadata {
         return found
     }
 
-    internal fun childrenOf(box: Mp4Box, bytes: ByteArray): List<Mp4Box> {
+    internal fun childrenOf(source: Mp4ByteSource, box: Mp4Box): List<Mp4Box> {
         if (box.type !in CONTAINER_TYPES) return emptyList()
-        val childStart = if (box.type == "meta") metaChildStart(box, bytes) else box.payloadStart
+        val childStart = if (box.type == "meta") metaChildStart(source, box) else box.payloadStart
         if (childStart > box.end) {
             throw IllegalArgumentException("MP4 ${box.type} box has no room for children")
         }
-        return parseBoxes(bytes, childStart, box.end)
+        return parseBoxes(source, childStart, box.end)
     }
 
-    private fun metaChildStart(box: Mp4Box, bytes: ByteArray): Int {
+    private fun metaChildStart(source: Mp4ByteSource, box: Mp4Box): Long {
         // Both forms occur in real files: QuickTime metadata commonly puts `hdlr` at
         // the payload start, while ISO FullBox metadata puts version/flags there first.
-        return if (looksLikeBoxHeader(bytes, box.payloadStart, box.end)) {
+        return if (looksLikeBoxHeader(source, box.payloadStart, box.end)) {
             box.payloadStart
         } else {
             box.payloadStart + 4
         }
     }
 
-    private fun looksLikeBoxHeader(bytes: ByteArray, start: Int, end: Int): Boolean {
+    private fun looksLikeBoxHeader(source: Mp4ByteSource, start: Long, end: Long): Boolean {
         if (start < 0 || start + 8 > end) return false
-        val size = readUInt32(bytes, start)
-        val type = decodeType(bytes, start + 4)
+        val size = source.readUInt32(start)
+        val type = source.decodeType(start + 4)
         if (!type.all { it.code in 0x20..0x7e || it == '©' }) return false
         return when (size) {
             0L -> true
-            1L -> start + 16 <= end && readUInt64(bytes, start + 8) <= (end - start).toLong()
-            else -> size >= 8L && size <= (end - start).toLong()
+            1L -> start + 16 <= end && source.readUInt64(start + 8) <= end - start
+            else -> size >= 8L && size <= end - start
         }
     }
 
-    internal fun parseBoxes(bytes: ByteArray, start: Int, end: Int): List<Mp4Box> {
+    internal fun parseBoxes(source: Mp4ByteSource, start: Long, end: Long): List<Mp4Box> {
         val boxes = mutableListOf<Mp4Box>()
         var cursor = start
         while (cursor < end) {
             if (end - cursor < 8) {
                 throw IllegalArgumentException("Truncated MP4 box header at offset $cursor")
             }
-            val size32 = readUInt32(bytes, cursor)
-            val type = decodeType(bytes, cursor + 4)
+            val size32 = source.readUInt32(cursor)
+            val type = source.decodeType(cursor + 4)
             val headerSize: Int
             val boxSize: Long
             when (size32) {
                 0L -> {
                     // A zero-sized box extends to its containing box's end.
                     headerSize = 8
-                    boxSize = (end - cursor).toLong()
+                    boxSize = end - cursor
                 }
                 1L -> {
                     if (end - cursor < 16) {
                         throw IllegalArgumentException("Truncated extended MP4 box header at offset $cursor")
                     }
                     headerSize = 16
-                    boxSize = readUInt64(bytes, cursor + 8)
+                    boxSize = source.readUInt64(cursor + 8)
                 }
                 else -> {
                     headerSize = 8
                     boxSize = size32
                 }
             }
-            if (boxSize < headerSize || boxSize > (end - cursor).toLong()) {
+            if (boxSize < headerSize || boxSize > end - cursor) {
                 throw IllegalArgumentException("Invalid MP4 box size $boxSize for $type at $cursor")
             }
-            val boxEnd = cursor + boxSize.toIntChecked("box end")
+            val boxEnd = cursor + boxSize
             boxes += Mp4Box(type, cursor, headerSize, cursor + headerSize, boxEnd)
             cursor = boxEnd
         }
@@ -212,16 +233,105 @@ object Mp4LocationMetadata {
         return toInt()
     }
 
+    /** A parsed box. All positions are file-wide [Long] offsets, never `Int`. */
     internal data class Mp4Box(
         val type: String,
-        val start: Int,
+        val start: Long,
         val headerSize: Int,
-        val payloadStart: Int,
-        val end: Int,
+        val payloadStart: Long,
+        val end: Long,
     )
 
     internal val CONTAINER_TYPES = setOf(
         "moov", "udta", "meta", "ilst", "trak", "mdia", "minf", "stbl", "dinf",
         "edts", "mvex", "moof", "traf", "mfra", "skip", "ipro", "sinf", "schi", "wave",
     )
+}
+
+/**
+ * Random-access byte window over an MP4's bytes. Positions are file-wide [Long]
+ * offsets so files beyond 2 GB are addressable; only single metadata atoms are ever
+ * materialized as [ByteArray].
+ */
+internal interface Mp4ByteSource : java.io.Closeable {
+    val size: Long
+    fun readUInt32(offset: Long): Long
+    fun readUInt64(offset: Long): Long
+    fun readAtom(offset: Long, length: Int): ByteArray
+    fun decodeType(offset: Long): String
+}
+
+/** In-memory source for bytes that are genuinely already buffered (tests, small atoms). */
+internal class Mp4ByteArraySource(private val bytes: ByteArray) : Mp4ByteSource {
+    override val size: Long get() = bytes.size.toLong()
+
+    override fun readUInt32(offset: Long): Long {
+        require(offset in 0..bytes.size - 4) { "MP4 u32 read out of range: $offset" }
+        return Mp4LocationMetadata.readUInt32(bytes, offset.toInt())
+    }
+
+    override fun readUInt64(offset: Long): Long {
+        require(offset in 0..bytes.size - 8) { "MP4 u64 read out of range: $offset" }
+        return Mp4LocationMetadata.readUInt64(bytes, offset.toInt())
+    }
+
+    override fun readAtom(offset: Long, length: Int): ByteArray {
+        require(offset >= 0 && length >= 0 && offset + length <= bytes.size) {
+            "MP4 atom read out of range: offset=$offset length=$length size=${bytes.size}"
+        }
+        return bytes.copyOfRange(offset.toInt(), offset.toInt() + length)
+    }
+
+    override fun decodeType(offset: Long): String {
+        require(offset in 0..bytes.size - 4) { "MP4 type read out of range: $offset" }
+        return Mp4LocationMetadata.decodeType(bytes, offset.toInt())
+    }
+
+    override fun close() = Unit
+}
+
+/**
+ * Seekable source over a real file. Reads are tiny (headers) or bounded to one
+ * metadata atom ([MAX_ATOM_BYTES]); the file is never buffered as a whole, which is
+ * what lets probing and finalization survive files far larger than the app heap.
+ */
+internal class Mp4FileByteSource(private val file: File) : Mp4ByteSource {
+    private val raf = RandomAccessFile(file, "r")
+
+    override val size: Long get() = raf.length()
+
+    override fun readUInt32(offset: Long): Long {
+        require(offset in 0..size - 4) { "MP4 u32 read out of range: $offset in ${file.name}" }
+        raf.seek(offset)
+        return ((raf.readByte().toLong() and 0xff) shl 24) or
+            ((raf.readByte().toLong() and 0xff) shl 16) or
+            ((raf.readByte().toLong() and 0xff) shl 8) or
+            (raf.readByte().toLong() and 0xff)
+    }
+
+    override fun readUInt64(offset: Long): Long {
+        require(offset in 0..size - 8) { "MP4 u64 read out of range: $offset in ${file.name}" }
+        raf.seek(offset)
+        val value = raf.readLong()
+        require(value >= 0L) { "MP4 box size exceeds supported JVM range in ${file.name}" }
+        return value
+    }
+
+    override fun readAtom(offset: Long, length: Int): ByteArray {
+        require(length in 0..MAX_METADATA_ATOM_BYTES) {
+            "MP4 atom of $length bytes at $offset in ${file.name} is implausibly large"
+        }
+        require(offset >= 0 && offset + length <= size) {
+            "MP4 atom read out of range: offset=$offset length=$length size=$size"
+        }
+        return ByteArray(length).also { buffer ->
+            raf.seek(offset)
+            raf.readFully(buffer)
+        }
+    }
+
+    override fun decodeType(offset: Long): String =
+        String(readAtom(offset, 4), StandardCharsets.ISO_8859_1)
+
+    override fun close() = raf.close()
 }
