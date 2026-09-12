@@ -96,7 +96,7 @@ Run the app end-to-end test:
 
 ```bash
 # macOS/Linux
-bash ./gradlew :app:connectedDebugAndroidTest \
+./gradlew :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.tagalong.app.E2eCutTest
 
 # Windows PowerShell
@@ -110,7 +110,7 @@ Run the engine instrumented test suite:
 
 ```bash
 # macOS/Linux
-bash ./gradlew :engine:connectedAndroidTest
+./gradlew :engine:connectedAndroidTest
 
 # Windows PowerShell
 .\gradlew.bat :engine:connectedAndroidTest
