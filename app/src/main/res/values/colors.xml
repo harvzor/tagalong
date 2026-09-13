@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Mirrors lightColorScheme().background (Material 3 ColorLightTokens.Background,
+        PaletteTokens.Neutral98). The window background is painted by the platform theme before
+        Compose draws its first frame, so it must equal the value Compose then paints, or a cold
+        start flashes a visibly different shade. Change it here if the Material 3 palette moves.
+    -->
+    <color name="tagalong_window_background">#FFFEF7FF</color>
+</resources>

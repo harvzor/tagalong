@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Light half of the app appearance. See values-night/themes.xml for the dark half; the two
+        share this style name and the framework picks between them from Configuration.uiMode.
+
+        This replaces the manifest's previous @android:style/Theme.Material.Light.NoActionBar,
+        which pinned the app to a light presentation no matter what the device was set to.
+
+        The window background and the two system-bar contrast flags below only describe the window
+        as it is first attached — before MainActivity's setContent draws. MainActivity's
+        enableEdgeToEdge() takes over the bar contrast from then on. They are set here so the
+        first frames, and the Recents snapshot taken from them, already match what the app draws.
+    -->
+    <style name="Theme.Tagalong" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/tagalong_window_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

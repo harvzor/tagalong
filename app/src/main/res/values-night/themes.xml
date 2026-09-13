@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Dark half of the app appearance. Selected by the framework when the device is in night
+        mode; the light half lives in values/themes.xml under the same style name.
+
+        Parent is the dark Material platform theme rather than a framework DayNight parent, so
+        the base styling that non-Compose views resolve — media3's PlayerView on the Trim and
+        Result screens — is dark as well. @color/tagalong_window_background resolves to the dark
+        value from values-night/colors.xml. See values/themes.xml for why these window
+        attributes are set.
+    -->
+    <style name="Theme.Tagalong" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/tagalong_window_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

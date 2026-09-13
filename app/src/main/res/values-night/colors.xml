@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Mirrors darkColorScheme().background (Material 3 ColorDarkTokens.Background,
+        PaletteTokens.Neutral6). See the note in values/colors.xml — this is the same colour name
+        under the night qualifier, and it must track the scheme value Compose paints.
+    -->
+    <color name="tagalong_window_background">#FF141218</color>
+</resources>
