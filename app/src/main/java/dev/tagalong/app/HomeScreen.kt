@@ -220,7 +220,10 @@ fun HomeScreen(navController: NavController, viewModel: CutViewModel) {
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Button(onClick = enableLocationAccess) {
+                        Button(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = enableLocationAccess,
+                        ) {
                             Text("Enable media location access")
                         }
                     }
