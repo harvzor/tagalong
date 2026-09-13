@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
@@ -220,7 +221,9 @@ fun HomeScreen(navController: NavController, viewModel: CutViewModel) {
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Button(
+                        // Secondary styling: the permission control must not compete with
+                        // the app's primary action ("Pick video" stays the filled button).
+                        OutlinedButton(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = enableLocationAccess,
                         ) {
@@ -231,7 +234,9 @@ fun HomeScreen(navController: NavController, viewModel: CutViewModel) {
 
                 // Always enabled: permission state degrades output quality, never blocks the flow.
                 Button(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
                     onClick = { pickVideo.launch(arrayOf("video/*")) },
                 ) {
                     Text("Pick video")
