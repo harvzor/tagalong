@@ -1,9 +1,14 @@
 package dev.tagalong.app
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -23,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 
 @Composable
@@ -75,8 +84,15 @@ fun HomeScreen(navController: NavController, viewModel: CutViewModel) {
     // stripping happens at the MediaDocumentsProvider stream level — it is not unique to the
     // Photo Picker path.  Holding this permission causes the framework to deliver the raw,
     // unredacted bytes so that location tags reach the cut engine and are copied through to
-    // the output automatically.  The permission is requested just before the picker launches;
-    // if the user denies it the pick still proceeds but a warning is shown.
+    // the output automatically.
+    //
+    // WHY THE PERMISSION IS REQUESTED ONLY FROM THE HOME-SCREEN CONTROL:
+    // The runtime request is owned exclusively by the "Enable media location access" button
+    // below; the pick flow never requests it and is never blocked by permission state.  This
+    // keeps the pick tap to a single system dialog (the picker's own media consent on modern
+    // Android) and gives the permission a persistent, explainable home instead of a transient
+    // mid-flow prompt.  A denial degrades the cut output (GPS is stripped by the framework);
+    // the persistent status panel is the sole place this is communicated.
     val context = LocalContext.current
     var locationPermissionGranted by remember {
         mutableStateOf(
@@ -85,24 +101,52 @@ fun HomeScreen(navController: NavController, viewModel: CutViewModel) {
         )
     }
 
+    // Re-check on every resume so grants/revokes made in system settings while the app was
+    // backgrounded are reflected without a process restart (the status line must never go stale).
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                locationPermissionGranted = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACCESS_MEDIA_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.onVideoPicked(uri)
         // Navigation to "trim" happens via the navigateToTrim LaunchedEffect above,
         // once the ViewModel's async materialise-and-probe coroutine completes.
     }
 
-    // Request ACCESS_MEDIA_LOCATION; on result update state and — if granted — open the picker.
-    // If denied the user still gets to pick, just without unredacted GPS bytes in the stream.
+    // The Enable button's request path.  Results only update the status state; nothing is
+    // chained onto it — the pick flow is independent of the permission by design.
+    var permissionRequestedOnce by remember { mutableStateOf(false) }
     val requestLocationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        permissionRequestedOnce = true
         locationPermissionGranted = granted
-        pickVideo.launch(arrayOf("video/*"))
     }
 
-    val launchPick: () -> Unit = {
-        if (locationPermissionGranted) {
-            pickVideo.launch(arrayOf("video/*"))
+    // Dual behavior (design D2): fire the system request while a dialog is still possible;
+    // once the OS has silently auto-denied further requests (rationale false after a decline),
+    // route the user to app-detail settings instead of producing a dead tap with no dialog.
+    val enableLocationAccess: () -> Unit = {
+        val activity = context as? Activity
+        if (activity != null && permissionRequestedOnce &&
+            !ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.ACCESS_MEDIA_LOCATION
+            )
+        ) {
+            val intent = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", context.packageName, null)
+            )
+            context.startActivity(intent)
         } else {
             requestLocationPermission.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
         }
@@ -142,26 +186,52 @@ fun HomeScreen(navController: NavController, viewModel: CutViewModel) {
                     .padding(top = maxHeight * 0.25f),
             )
 
-            // "Pick video" button (+ optional warning) exactly centred in the box
+            // Media-location status block (above the primary action) + "Pick video", centred.
             Column(
                 modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                // Persistent media-location access status.  This is the app's only permission
+                // prompt point; state derives from checkSelfPermission, refreshed on resume.
+                if (locationPermissionGranted) {
+                    // Inert status line — revocation intentionally stays in system settings.
+                    Text(
+                        text = "\uD83D\uDCCD Media location access granted \u2713",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = "Media location access is off",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        // Mechanism-only copy: describes what the permission reads and what is
+                        // lost without it — no behavioral disclaimers (deliberate, design D5).
+                        Text(
+                            text = "GPS coordinates are stored inside your video files. " +
+                                "Without permission to read them, Android strips GPS from every cut.",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(onClick = enableLocationAccess) {
+                            Text("Enable media location access")
+                        }
+                    }
+                }
+
+                // Always enabled: permission state degrades output quality, never blocks the flow.
                 Button(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = launchPick,
+                    onClick = { pickVideo.launch(arrayOf("video/*")) },
                 ) {
                     Text("Pick video")
-                }
-                // Shown only when the user has denied ACCESS_MEDIA_LOCATION — GPS tags will
-                // likely be absent from the stream so the warning prepares them for that outcome.
-                if (!locationPermissionGranted) {
-                    Text(
-                        text = "GPS location may not be preserved — location access was denied",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
                 }
             }
         }

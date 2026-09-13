@@ -1,16 +1,16 @@
 ## 1. Home screen rework (`HomeScreen.kt`)
 
-- [ ] 1.1 Add resume-lifecycle permission state: evaluate `checkSelfPermission(ACCESS_MEDIA_LOCATION)` on each lifecycle resume (via `LocalLifecycleOwner` observer; `lifecycle-runtime-compose` already a dependency) so the UI reflects grant/revoke made in system settings
-- [ ] 1.2 Add the media-location block above the "Pick video" button: off-state = heading "Media location access is off" + mechanism-only copy ("GPS coordinates are stored inside your video files. Without permission to read them, Android strips GPS from every cut.") + "Enable media location access" button; on-state = inert line "📍 Media location access granted ✓" (no enable control, no warning, not clickable)
-- [ ] 1.3 Implement the Enable button's dual behavior (design D2): `RequestPermission(ACCESS_MEDIA_LOCATION)` while a dialog is possible; after a first declined request when `shouldShowRequestPermissionRationale` is false, launch `ACTION_APPLICATION_DETAILS_SETTINGS` with the `package:` URI instead
-- [ ] 1.4 Simplify the pick path: "Pick video" always enabled, `onClick` calls `pickVideo.launch(arrayOf("video/*"))` directly; delete the `RequestPermission` branch in `launchPick`, the now-unused chaining state, and the red "GPS location may not be preserved" warning `Text`
-- [ ] 1.5 Update the long WHY comment on the pick launchers to describe the new choreography (permission owned by the Home control; picker untouched rationale unchanged)
+- [x] 1.1 Add resume-lifecycle permission state: evaluate `checkSelfPermission(ACCESS_MEDIA_LOCATION)` on each lifecycle resume (via `LocalLifecycleOwner` observer; `lifecycle-runtime-compose` already a dependency) so the UI reflects grant/revoke made in system settings
+- [x] 1.2 Add the media-location block above the "Pick video" button: off-state = heading "Media location access is off" + mechanism-only copy ("GPS coordinates are stored inside your video files. Without permission to read them, Android strips GPS from every cut.") + "Enable media location access" button; on-state = inert line "📍 Media location access granted ✓" (no enable control, no warning, not clickable)
+- [x] 1.3 Implement the Enable button's dual behavior (design D2): `RequestPermission(ACCESS_MEDIA_LOCATION)` while a dialog is possible; after a first declined request when `shouldShowRequestPermissionRationale` is false, launch `ACTION_APPLICATION_DETAILS_SETTINGS` with the `package:` URI instead
+- [x] 1.4 Simplify the pick path: "Pick video" always enabled, `onClick` calls `pickVideo.launch(arrayOf("video/*"))` directly; delete the `RequestPermission` branch in `launchPick`, the now-unused chaining state, and the red "GPS location may not be preserved" warning `Text`
+- [x] 1.5 Update the long WHY comment on the pick launchers to describe the new choreography (permission owned by the Home control; picker untouched rationale unchanged)
 
 ## 2. Build & automated tests
 
-- [ ] 2.1 `./gradlew :app:assembleDebug` compiles cleanly (no Kotlin plugin/`kotlinOptions` additions per toolchain rules)
-- [ ] 2.2 With the verified AVD running, `./gradlew :app:connectedAndroidTest` passes — confirm `E2eCutTest` still finds the exact-text "Pick video" node (new copy must not contain that substring) and completes the pick → trim → cut flow with `ACCESS_MEDIA_LOCATION` auto-granted
-- [ ] 2.3 `./gradlew :engine:testDebugUnitTest` passes (should be untouched; run as regression guard)
+- [x] 2.1 `./gradlew :app:assembleDebug` compiles cleanly (no Kotlin plugin/`kotlinOptions` additions per toolchain rules)
+- [x] 2.2 With the verified AVD running, `./gradlew :app:connectedAndroidTest` passes — confirm `E2eCutTest` still finds the exact-text "Pick video" node (new copy must not contain that substring) and completes the pick → trim → cut flow with `ACCESS_MEDIA_LOCATION` auto-granted
+- [x] 2.3 `./gradlew :engine:testDebugUnitTest` passes (should be untouched; run as regression guard)
 
 ## 3. Manual verification on device/emulator (auto-grant rules bypass the off-state)
 
@@ -21,5 +21,5 @@
 
 ## 4. Spec & doc hygiene
 
-- [ ] 4.1 Confirm no changes needed outside `HomeScreen.kt` (manifest, `CutViewModel`, engine, `E2eCutTest` all untouched per proposal Impact)
+- [x] 4.1 Confirm no changes needed outside `HomeScreen.kt` (manifest, `CutViewModel`, engine, `E2eCutTest` all untouched per proposal Impact)
 - [ ] 4.2 After merge: `openspec archive --change "add-home-location-access-control"` so `home-screen` and `cut-workflow` main specs pick up the deltas
