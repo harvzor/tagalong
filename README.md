@@ -30,6 +30,8 @@ Tagalong uses FFmpeg to copy the video and audio streams without re-encoding, wi
 
 Files are selected via `ACTION_OPEN_DOCUMENT` rather than the Android Photo Picker. The Photo Picker can strip GPS from the bytes it gives an app, replace the real filename with an internal numeric ID, and omit the gallery-relative path. `ACTION_OPEN_DOCUMENT` gives Tagalong direct, persistent access to the one file the user explicitly selected, so the original bytes and their metadata can be read.
 
+You can also skip the picker entirely: select a video in your gallery and **share it to Tagalong** — the app opens straight at the trim screen with that video loaded. A cut preserves every tag present in the file the sending app hands over; if a sender strips metadata before sharing (some galleries share a privacy-copy without location), the result screen's metadata diff shows that honestly on the source side.
+
 There is one more subtlety to GPS preservation: an MP4 can store a logical location in different physical forms. Device-originated videos may carry the gallery-compatible QuickTime `moov/udta/©xyz` atom, while FFprobe can normalize that and a generic `mdta/location` entry to the same logical `location` tag. A logical FFprobe value alone is therefore not enough to prove compatibility; Tagalong preserves and checks the raw `©xyz` representation because gallery applications such as Google Photos may ignore the generic form. Both canonical device samples in this repository contain the QuickTime location atom, although their coordinates are intentionally not documented here.
 
 ## Install
@@ -40,7 +42,7 @@ Download the latest APK from [GitHub Releases](https://github.com/harvzor/tagalo
 
 | Permission                | Why                                                                                                                                                                                                                                                                                                                                                                                                              |
 |---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **ACCESS_MEDIA_LOCATION** | Android's media framework strips GPS location tags from any `openInputStream` call made without this permission — even when `ACTION_OPEN_DOCUMENT` is used. This permission ensures Tagalong receives an unredacted byte stream for the file you explicitly selected. It is used exclusively to read location that is already embedded in that file; the app has no analytics, no network calls, and no backend. |
+| **ACCESS_MEDIA_LOCATION** | Android's media framework strips GPS location tags from any `openInputStream` call made without this permission — whether the video was picked in-app via `ACTION_OPEN_DOCUMENT` or shared in from your gallery. This permission ensures Tagalong receives an unredacted byte stream for the file you explicitly selected. It is used exclusively to read location that is already embedded in that file; the app has no analytics, no network calls, and no backend. |
 
 ## Building
 

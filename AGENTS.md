@@ -66,6 +66,7 @@ Host-side unit tests (`:engine:testDebugUnitTest`) run without an emulator. The 
 Before shipping a release, in addition to the automated suites:
 
 - Cut a multi-minute 4K clip (file larger than the app memory class) on the real Pixel 10a and confirm: the cut succeeds, Google Photos shows the location on the saved output, and it plays normally. The emulator corpus is 11–16 MB and cannot exercise the large-file paths.
+- Complete the share-fidelity matrix on physical devices (share a known-location sample to Tagalong from Google Photos and the system gallery; confirm the received bytes and cut output carry location + capture date). Score sheet: `notes/share-fidelity.md` under the `add-share-target` change directory (follow it into `openspec/changes/archive/` when the change archives). Emulator row already green; a materially degraded physical-device row is grounds for reverting the share target, per that change's Migration Plan.
 
 ---
 
@@ -82,6 +83,19 @@ This app's primary function is **lossless video trimming with complete metadata 
 | **Gallery path** — `RELATIVE_PATH` is nulled out | The path label shown to the user while trimming would be incomplete |
 
 `ACTION_OPEN_DOCUMENT` is the standard Android mechanism for granting an app **direct, persistent, unredacted access to a single file the user explicitly selects**. The app requests no broad media permissions and accesses only the file the user picks. This is the narrowest permission model that satisfies the metadata-preservation contract that is the app's reason for existing.
+
+## Why the app also accepts ACTION_SEND
+
+> This section exists to support Play Store review responses.
+
+Tagalong additionally registers as a target for `ACTION_SEND` (`video/*`) so a user can share a video from their gallery straight into the editor instead of opening the app and re-picking the same file. This does **not** widen the app's permission model:
+
+- **The user still explicitly selects one file.** The share sheet is the selection gesture; `ACTION_SEND` grants the receiving app read access to exactly that one URI, for that one session. The app requests no new permission, no broad media access, and continues to touch only the file the user handed it.
+- **The preservation engine is unchanged.** A shared video goes through the identical materialise → probe → cut pipeline; every tag present in the received byte stream is carried to the output unchanged, and the result screen's metadata diff reports source → output tag survival honestly.
+- **Fidelity of the received bytes is the sender's decision, not the app's.** A gallery app that hands over a redacted "share copy" (e.g. with location removed by the sender's own privacy setting) is outside the cut contract, which is about preserving metadata *through the cut*, not about the sending app's behavior before the hand-off. Where the shared URI references the system media provider directly, the app reads the unredacted original (`MediaStore.setRequireOriginal` + `ACCESS_MEDIA_LOCATION`, the documented mechanism). Sender-side absence is never hidden: the diff card shows the tag as absent on the source side, and the app displays no share-specific warnings, prompts, or permission requests of its own.
+- **Location data still goes nowhere.** As with the picker path (see below), GPS values already embedded in the user's own file are read solely to be preserved into the user's own output file. No network, no backend, no analytics — unchanged by this entry point.
+
+Measured fidelity so far (2026-09-13): Google Photos handing a gallery video to Tagalong delivered a **byte-identical original** — every tag, GPS included, arrived and survived the cut (verified on the emulator's Google Photos; the physical-device matrix is on the Pre-release manual verification checklist below and is recorded in change `add-share-target`, `notes/share-fidelity.md`). The result screen's metadata diff card is the honesty surface for any sender that behaves differently: a share copy already stripped by the sending app shows as absence on the source side of the diff, never hidden and never excused.
 
 ## Why the app declares ACCESS_MEDIA_LOCATION
 
@@ -114,6 +128,7 @@ Key commands: `openspec new change "<name>"`, `openspec status --change "<name>"
 |---|---|---|
 | 0 | Move proven engine into shippable `:engine` module | ✅ Done (2026-08-16) |
 | 1 | Thinnest lossless slice: pick → trim → save to gallery | ✅ Done (2026-08-17, commit e9506d6) |
+| 1b | Share-to-Tagalong direct-to-trim entry point (`add-share-target`) | ✅ Code + tests done, verdict KEEP (2026-09-13); physical-device fidelity rows on the pre-release checklist |
 | 2 | Mode toggle + re-encode | 🔲 Next |
 | 3 | Keyframe-snap caveat, error states, polish | 🔲 Later |
 
