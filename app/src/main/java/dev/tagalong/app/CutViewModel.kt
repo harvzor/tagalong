@@ -2,12 +2,15 @@ package dev.tagalong.app
 
 import android.app.Application
 import android.content.ContentUris
+import android.content.ContentResolver
+import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.tagalong.engine.DateTakenStore
@@ -23,6 +26,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Resolved identity of a source video, whichever URI shape delivered it (see queryMediaRow). */
+private data class SourceMeta(
+    val displayName: String,
+    val relativePath: String?,
+    val absolutePath: String?,
+)
 
 /**
  * Drives the pick → trim → cut → save pipeline (design D1/D6). All I/O — the cache copy,
@@ -40,6 +50,23 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
     private val _navigateToTrim = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val navigateToTrim: SharedFlow<Unit> = _navigateToTrim.asSharedFlow()
 
+    /**
+     * Share intake marker (design D3): the "consume exactly once" contract lives here rather
+     * than in the Activity because this marker survives configuration changes and dies with
+     * the process — exactly the two cases to distinguish. A configuration change re-offers
+     * the same launch intent to the same ViewModel instance and dedupes to a no-op; a
+     * process death yields a fresh ViewModel and the redelivered share re-intakes (accepted
+     * degradation: the user sees Trim reloading instead of a broken restore).
+     */
+    private var consumedShareUri: Uri? = null
+
+    /** Routes a parsed share into the normal pick pipeline, at most once per Uri. */
+    fun consumeSharedVideo(uri: Uri) {
+        if (consumedShareUri == uri) return
+        consumedShareUri = uri
+        onVideoPicked(uri)
+    }
+
     /** Uri → cache `File` (D1), then probe its duration. Resets any prior source/cut state. */
     fun onVideoPicked(uri: Uri) {
         _uiState.value = CutUiState(cutState = CutState.Idle)
@@ -47,13 +74,11 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     val resolver = getApplication<Application>().contentResolver
-                    data class SourceMeta(
-                        val displayName: String,
-                        val relativePath: String?,
-                        val absolutePath: String?,
-                    )
-                    // Resolve the source path. ACTION_OPEN_DOCUMENT can return URIs from
-                    // several document providers; each has its own document-ID format:
+                    // Resolve the source path. Share and ACTION_OPEN_DOCUMENT URIs come in
+                    // several shapes; each has its own resolution:
+                    //
+                    //  • Plain media row URI      (authority "media", share path)
+                    //    The Uri already addresses the row — query it directly.
                     //
                     //  • ExternalStorageProvider  (com.android.externalstorage.documents)
                     //    docId = "primary:DCIM/Camera/foo.mp4"
@@ -67,6 +92,11 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                     // a DISPLAY_NAME-only query on the document URI.
                     val meta: SourceMeta = runCatching {
                         val authority = uri.authority ?: ""
+                        if (authority == MediaStore.AUTHORITY) {
+                            // Share-supplied plain media row URI (content://media/...): not a
+                            // document Uri — getDocumentId would throw before we got here.
+                            queryMediaRow(resolver, uri)
+                        } else {
                         val docId = DocumentsContract.getDocumentId(uri)
                         when {
                             authority == "com.android.externalstorage.documents" -> {
@@ -80,34 +110,15 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
                                 SourceMeta(name, relPath, absPath)
                             }
                             authority == "com.android.providers.media.documents" -> {
-                                // docId: "video:1234"
+                                // docId: "video:1234" — same row query the share path uses.
                                 val rowId = docId.substringAfter(':').toLong()
                                 val msUri = ContentUris.withAppendedId(
                                     MediaStore.Video.Media.EXTERNAL_CONTENT_URI, rowId
                                 )
-                                resolver.query(
-                                    msUri,
-                                    arrayOf(
-                                        MediaStore.MediaColumns.DISPLAY_NAME,
-                                        MediaStore.MediaColumns.RELATIVE_PATH,
-                                        MediaStore.MediaColumns.DATA,
-                                    ),
-                                    null, null, null,
-                                )?.use { cursor ->
-                                    if (cursor.moveToFirst()) {
-                                        val name = cursor.getString(0)?.takeIf { it.isNotBlank() }
-                                        val rel  = cursor.getString(1)?.takeIf { it.isNotBlank() }
-                                        val data = cursor.getString(2)?.takeIf { it.isNotBlank() }
-                                        val absPath = data
-                                            ?: if (rel != null && name != null)
-                                                Environment.getExternalStorageDirectory().absolutePath +
-                                                    "/" + rel.trimEnd('/') + "/" + name
-                                               else null
-                                        SourceMeta(name ?: "video.mp4", rel, absPath)
-                                    } else null
-                                }
+                                queryMediaRow(resolver, msUri)
                             }
                             else -> null
+                        }
                         }
                     }.getOrNull()
                     // Fall back to querying the document URI itself for DISPLAY_NAME only.
@@ -219,16 +230,71 @@ class CutViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Queries DISPLAY_NAME / RELATIVE_PATH / DATA for a Uri that already addresses a
+     * MediaStore video row, composing an absolute path from RELATIVE_PATH when DATA is
+     * absent. Shared by the share path (plain media URI) and the ACTION_OPEN_DOCUMENT
+     * media-documents branch (row id re-appended to the content collection Uri).
+     */
+    private fun queryMediaRow(resolver: ContentResolver, uri: Uri): SourceMeta? =
+        resolver.query(
+            uri,
+            arrayOf(
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.RELATIVE_PATH,
+                MediaStore.MediaColumns.DATA,
+            ),
+            null, null, null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val name = cursor.getString(0)?.takeIf { it.isNotBlank() }
+                val rel  = cursor.getString(1)?.takeIf { it.isNotBlank() }
+                val data = cursor.getString(2)?.takeIf { it.isNotBlank() }
+                val absPath = data
+                    ?: if (rel != null && name != null)
+                        Environment.getExternalStorageDirectory().absolutePath +
+                            "/" + rel.trimEnd('/') + "/" + name
+                       else null
+                SourceMeta(name ?: "video.mp4", rel, absPath)
+            } else null
+        }
+
+    /**
+     * Copies the incoming Uri into the cache immediately at intake time. This is deliberate,
+     * not incidental: a share's FLAG_GRANT_READ_URI_PERMISSION grant is ephemeral (tied to
+     * the recipient's task), so the copy must complete while the grant is certainly alive.
+     * Everything downstream — probe, cut engine, output naming — reads the cache File and
+     * never re-opens the Uri, so grant expiry can never break a session mid-cut.
+     */
     private fun materializeToCache(uri: Uri): File {
         val resolver = getApplication<Application>().contentResolver
         val extension = resolver.getType(uri)
             ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
             ?: "mp4"
         val file = File(getApplication<Application>().cacheDir, "input.$extension")
-        resolver.openInputStream(uri)?.use { input ->
+        resolver.openInputStream(unredactedReadUri(uri))?.use { input ->
             file.outputStream().use { output -> input.copyTo(output) }
         } ?: error("Could not open the picked video")
         return file
+    }
+
+    /**
+     * Plain openInputStream on a MediaStore row Uri returns location-redacted bytes even
+     * with ACCESS_MEDIA_LOCATION granted — setRequireOriginal is the documented unredaction
+     * mechanism for media URIs. Non-media authorities (a sender's FileProvider copy, etc.)
+     * are taken as handed: the sender already decided the bytes, there is nothing to
+     * unredact. runCatching keeps OEM throwables (SecurityException,
+     * UnsupportedOperationException) a degrade to redacted bytes, never a hard failure —
+     * the "never blocked by permission state" invariant.
+     */
+    private fun unredactedReadUri(uri: Uri): Uri {
+        val app = getApplication<Application>()
+        if (uri.authority != MediaStore.AUTHORITY) return uri
+        val granted = ContextCompat.checkSelfPermission(
+            app, android.Manifest.permission.ACCESS_MEDIA_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) return uri
+        return runCatching { MediaStore.setRequireOriginal(uri) }.getOrDefault(uri)
     }
 
     private fun readDurationMs(file: File): Long {

@@ -18,12 +18,41 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Tagalong">
 
+        <!--
+            launchMode="singleTask": the share intake contract is "consume exactly once".
+            standard would stack a second MainActivity per share and leave stale launch
+            intents behind; singleTop only dedupes when the instance is already on top.
+            singleTask gives one instance and routes every arrival (launcher relaunch,
+            re-share) through onNewIntent, where getIntent() is refreshed so a consumed
+            share can never be re-parsed on relaunch.
+        -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                Share target: the user picks a video in a gallery/file app and shares it
+                to Tagalong directly. NO android:scheme here, deliberately: the canonical
+                ACTION_SEND carries its file in EXTRA_STREAM with the intent's data field
+                empty, and share sheets resolve with a type-only query — a scheme-bearing
+                filter never matches that shape (verified on-device: `cmd package
+                query-activities -a SEND -t video/mp4` omits this app, -d with a content
+                uri includes it). The file:// / String / non-video bouncers live in
+                MainActivity.parseSharedVideo instead, where an unusable payload degrades
+                to the silent Home fallback. ACTION_SEND_MULTIPLE is intentionally not
+                declared: N videos is an unscoped UX (see add-share-target design D1).
+                See AGENTS.md "Why the app also accepts ACTION_SEND" for the Play-review
+                rationale.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="video/*" />
             </intent-filter>
         </activity>
 

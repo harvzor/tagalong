@@ -1,5 +1,8 @@
 package dev.tagalong.app
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,7 +20,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -58,9 +63,37 @@ private fun TagalongTheme(content: @Composable () -> Unit) {
 }
 
 class MainActivity : ComponentActivity() {
+
+    /**
+     * Activity-held NavHostController, set from the composition below. onNewIntent needs a
+     * navigation reference to route a re-share into the live session; the SharedFlow handoff
+     * HomeScreen collects cannot serve it because Home is not composed on a share session.
+     */
+    private var navControllerRef: NavHostController? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Share intake, resolved once before the first composition (design D2: the
+        // startDestination is launch-intent-dependent, so it must be known before NavHost
+        // is created — an intent-dependent destination decided mid-composition would race
+        // the first frame). An unusable or absent share parses to null and the launch is
+        // an ordinary Home launch with no error UI (spec: "falls back silently").
+        //
+        // Redelivery after process death is handled by the ViewModel, not here: onCreate
+        // always offers the launch intent, and consumeSharedVideo() dedupes by Uri against
+        // an instance-surviving marker — a configuration change (same ViewModel) is a
+        // no-op, a process death (fresh ViewModel) re-intakes as an accepted degradation
+        // (design D3). A live-session relaunch cannot re-parse a stale share because
+        // singleTask + setIntent() in onNewIntent below keeps getIntent() current.
+        val viewModel: CutViewModel = shareIntakeViewModel()
+        val sharedVideo = parseSharedVideo(intent)
+        if (sharedVideo != null) {
+            viewModel.consumeSharedVideo(sharedVideo)
+        }
+        val startDestination = if (sharedVideo != null) "trim" else "home"
+
         setContent {
             TagalongTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -70,9 +103,10 @@ class MainActivity : ComponentActivity() {
                     // screen a separate instance — which would lose all state on navigation.
                     val viewModel: CutViewModel = viewModel()
                     val navController = rememberNavController()
+                    navControllerRef = navController
                     NavHost(
                         navController = navController,
-                        startDestination = "home",
+                        startDestination = startDestination,
                         // Parallax slide, replacing navigation-compose's default 700ms crossfade
                         // (fadeIn/fadeOut tween(700), identical in both directions). Two things
                         // were wrong with the default: 700ms of pure alpha gives the eye nothing
@@ -140,5 +174,58 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // singleTask routes every arrival into this instance: a re-share, and a launcher
+        // relaunch (ACTION_MAIN). setIntent() refreshes getIntent() so a consumed share
+        // can never be re-parsed as a launch share after this point.
+        setIntent(intent)
+        val sharedVideo = parseSharedVideo(intent) ?: return  // ACTION_MAIN: resume as-is
+
+        // Consume exactly once (re-sharing the same video while it is already the loaded
+        // source is deduped by the ViewModel; a different video replaces it), then route to
+        // Trim wherever the session currently sits. popUpTo("trim") collapses trim-and-above
+        // (e.g. a stale Result screen) so the back stack never accumulates a loop.
+        shareIntakeViewModel().consumeSharedVideo(sharedVideo)
+        navControllerRef?.navigate("trim") {
+            launchSingleTop = true
+            popUpTo("trim")
+        }
+    }
+
+    /**
+     * The same CutViewModel instance the composition resolves via viewModel() — both go
+     * through the Activity's ViewModelStore with the DefaultKey convention, so the intake
+     * in onCreate/onNewIntent and the UI always drive one instance.
+     */
+    private fun shareIntakeViewModel(): CutViewModel =
+        ViewModelProvider(this)[CutViewModel::class.java]
+
+    /**
+     * Single share parser (design D1): an ACTION_SEND intent yields a usable video only if
+     * it carries a parcelled Uri — not a String path, not a file:// Uri (blocked cross-app
+     * since API 24; such senders land in the silent Home fallback instead) — whose MIME is
+     * video. The resolver's type is authoritative when the provider reports one; the
+     * declared intent type is the gate, never proof — the probe in onVideoPicked still
+     * decides whether the bytes are a real video.
+     */
+    private fun parseSharedVideo(intent: Intent?): Uri? {
+        if (intent?.action != Intent.ACTION_SEND) return null
+        // runCatching: a sender that put a String (or anything non-Uri) in EXTRA_STREAM
+        // throws ClassCastException on extraction — that is just an unusable share.
+        val stream = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            }
+        }.getOrNull() as? Uri ?: return null
+        val uri = stream
+        if (uri.scheme != "content") return null
+        val mime = runCatching { contentResolver.getType(uri) }.getOrNull() ?: intent.type
+        return uri.takeIf { mime?.startsWith("video/") == true }
     }
 }

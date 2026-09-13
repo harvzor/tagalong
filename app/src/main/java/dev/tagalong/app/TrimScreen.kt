@@ -2,6 +2,7 @@ package dev.tagalong.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -40,8 +41,10 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val cutState = uiState.cutState
 
-    // Guard: if source is null (e.g. after process-death restore), pop back to home so the
-    // user can pick again. Under normal navigation source is always non-null here.
+    // Guard: if source is null (e.g. after process-death restore of a picked session), pop
+    // back to home so the user can pick again. On a share-launched session Trim IS the start
+    // destination and no "home" entry exists to pop to — popBackStack reports failure and the
+    // busy state below carries the screen until the intake copy/probe lands (design D2/D3).
     val source = uiState.source
     LaunchedEffect(source) {
         if (source == null) {
@@ -49,7 +52,14 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
         }
     }
 
-    if (source == null) return  // render nothing while the guard effect fires
+    if (source == null) {
+        // Busy placeholder: shown while a share intake materialises (Trim is the start
+        // destination, Home is never displayed), and for the single frame of a guard-pop.
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
     val player = rememberVideoPlayer(source.file)
 
