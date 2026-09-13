@@ -14,12 +14,12 @@
 
 ## 3. Manual verification on device/emulator (auto-grant rules bypass the off-state)
 
-- [ ] 3.1 Fresh install (permission not yet granted): Home shows the off panel above an enabled "Pick video"; tapping "Pick video" opens the system picker with **no** location dialog; a cut completes (location absent from output ProbeCard, as expected)
-- [ ] 3.2 Tap "Enable media location access" → system dialog appears → Allow → status line flips to "📍 Media location access granted ✓" and the panel disappears; a subsequent cut of a GPS-bearing sample preserves location (ProbeCard shows it)
-- [ ] 3.3 From the granted state, revoke via system settings and background/foreground the app → status reverts to the off panel without app restart (validates 1.1)
-- [ ] 3.4 After repeated denials put the OS in silent auto-deny: tapping "Enable media location access" shows no dialog and does nothing visible — verify no crash and status stays "off"; force-restart the app and confirm the dialog is offered again
+- [x] 3.1 Fresh install (permission not yet granted): Home shows the off panel above an enabled "Pick video"; tapping "Pick video" opens the system picker with **no** location dialog; a cut completes (location absent from output ProbeCard, as expected)
+- [x] 3.2 Tap "Enable media location access" → system dialog appears → Allow → status line flips to "📍 Media location access granted ✓" and the panel disappears; a subsequent cut of a GPS-bearing sample preserves location (ProbeCard shows it)
+- [x] 3.3 From the granted state, revoke via system settings and background/foreground the app → status reverts to the off panel without app restart (validates 1.1)
+- [x] 3.4 After repeated denials put the OS in silent auto-deny: tapping "Enable media location access" shows no dialog and does nothing visible — verify no crash and status stays "off"; force-restart the app and confirm the dialog is offered again
 
 ## 4. Spec & doc hygiene
 
 - [x] 4.1 Confirm no changes needed outside `HomeScreen.kt` (manifest, `CutViewModel`, engine, `E2eCutTest` all untouched per proposal Impact)
-- [ ] 4.2 After merge: `openspec archive --change "add-home-location-access-control"` so `home-screen` and `cut-workflow` main specs pick up the deltas
+- [x] 4.2 After merge: `openspec archive --change "add-home-location-access-control"` so `home-screen` and `cut-workflow` main specs pick up the deltas
