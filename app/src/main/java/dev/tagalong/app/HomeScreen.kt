@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -131,9 +132,14 @@ fun HomeScreen(navController: NavController, viewModel: CutViewModel) {
         locationPermissionGranted = granted
     }
 
+    // Opaque background is required, not cosmetic: screen transitions overlap the outgoing and
+    // incoming screens (and composite the returning screen *beneath* the departing one), so a
+    // transparent screen would show the other screen's content through it. Applied before
+    // windowInsetsPadding so the inset strips under the status/nav bars are painted too.
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),

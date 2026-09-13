@@ -1,6 +1,7 @@
 package dev.tagalong.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -81,9 +82,12 @@ fun ResultScreen(navController: NavController, viewModel: CutViewModel) {
     }
     BackHandler(onBack = onBack)
 
+    // Opaque background: see the same note in HomeScreen.kt. Must precede windowInsetsPadding
+    // so the strips under the status and nav bars are painted during a screen transition.
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),

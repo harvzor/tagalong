@@ -1,5 +1,6 @@
 package dev.tagalong.app
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,18 +49,26 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
         }
     }
 
-    // Navigate to the result screen as soon as the cut succeeds. ResultScreen calls
-    // viewModel.resetCutState() before popping back, so this LaunchedEffect will not
-    // re-trigger when returning to this screen (cutState will be Idle again).
-    LaunchedEffect(cutState) {
-        if (cutState is CutState.Saved) {
-            navController.navigate("result") { launchSingleTop = true }
-        }
-    }
-
     if (source == null) return  // render nothing while the guard effect fires
 
     val player = rememberVideoPlayer(source.file)
+
+    // Navigate to the result screen as soon as the cut succeeds. ResultScreen calls
+    // viewModel.resetCutState() before popping back, so this LaunchedEffect will not
+    // re-trigger when returning to this screen (cutState will be Idle again).
+    //
+    // Declared below the player deliberately: the preview has to stop before the transition to
+    // ResultScreen begins, not when this screen's lifecycle is downgraded afterwards — the
+    // outgoing entry's ON_STOP only fires once the transition animation has completed, which is
+    // late enough for a still-playing SurfaceView to trail across the screen. CutState.Saved
+    // always implies a non-null source, so living behind the null-source guard above does not
+    // change when this effect is able to fire.
+    LaunchedEffect(cutState) {
+        if (cutState is CutState.Saved) {
+            player.pause()
+            navController.navigate("result") { launchSingleTop = true }
+        }
+    }
     // Stop playback when the playhead reaches the trim end point (design D2). The effect
     // key is endMs only — any change to the trim end restarts the coroutine so the new
     // boundary is picked up immediately. Polling at 100 ms keeps CPU impact negligible
@@ -92,9 +101,12 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
         onDispose { player.removeListener(listener) }
     }
 
+    // Opaque background: see the same note in HomeScreen.kt. Must precede windowInsetsPadding
+    // so the strips under the status and nav bars are painted during a screen transition.
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -104,7 +116,12 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = { navController.popBackStack("home", inclusive = false) }) {
+            IconButton(onClick = {
+                // Stop the preview before the transition so the SurfaceView is not still
+                // painting while this screen slides away.
+                player.pause()
+                navController.popBackStack("home", inclusive = false)
+            }) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back to home",
@@ -155,7 +172,10 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
             // Demoted to OutlinedButton so "Cut and save" has clear visual priority (design D4).
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { navController.popBackStack("home", inclusive = false) },
+                onClick = {
+                    player.pause()
+                    navController.popBackStack("home", inclusive = false)
+                },
             ) {
                 Text("Pick a different video")
             }
