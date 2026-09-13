@@ -3,11 +3,19 @@
 The Home screen is the app's entry point, giving users a single place to pick a video to trim and navigate to the About screen.
 ## Requirements
 ### Requirement: Home screen is the launch destination
-The app SHALL open to the Home screen on launch. The Home screen SHALL NOT require any permissions or video to be pre-selected.
+
+The app SHALL open to the Home screen on a launcher launch. The Home screen SHALL NOT require any permissions or video to be pre-selected. A launch that carries a usable shared video is not a launcher launch and SHALL instead open at the Trim screen (see the `share-intake` capability); a share whose video is unusable falls back to this requirement's ordinary Home launch.
 
 #### Scenario: Cold launch
+
 - **WHEN** the user opens the app for the first time
 - **THEN** the Home screen is displayed with a "Pick video" button
+
+#### Scenario: Launcher launch after a share session
+
+- **WHEN** the user reopens Tagalong from the launcher after a session that began as a share
+- **THEN** the app resumes its existing session, or opens the Home screen if that session has ended
+- **AND** the earlier share is not replayed
 
 ### Requirement: User can pick a video from Home
 The Home screen SHALL provide a control to open the system file picker filtered to video files. On a successful pick the app SHALL navigate to the Trim screen.
@@ -28,11 +36,19 @@ The Home screen SHALL provide a navigation control that takes the user to the Ab
 - **THEN** the app navigates to the About screen
 
 ### Requirement: Back navigation from Trim returns to Home
-When the user navigates back from the Trim screen, the app SHALL return to the Home screen rather than exiting.
+
+When the user navigates back from a Trim screen whose session began at the Home screen (an in-app pick), the app SHALL return to the Home screen rather than exiting. When the user navigates back from a Trim screen that was opened directly by a shared video, the app SHALL exit to the sending app rather than showing the Home screen, because the user's point of entry was the sender, not Home.
 
 #### Scenario: Back from Trim
-- **WHEN** the user presses back on the Trim screen
+
+- **WHEN** the user presses back on a Trim screen reached via "Pick video" from the Home screen
 - **THEN** the app displays the Home screen
+
+#### Scenario: Back from Trim after a share
+
+- **WHEN** the user pressed back on a Trim screen opened by sharing a video from another app
+- **THEN** the app exits and the sending app is shown
+- **AND** the Home screen is not displayed
 
 ### Requirement: Home screen displays media location access status
 The Home screen SHALL display the current media location (`ACCESS_MEDIA_LOCATION`) permission status at all times, positioned above the "Pick video" control. When the permission is not granted, the Home screen SHALL explain the effect in terms of the file contents (location data stored inside videos is stripped from cuts without the permission) and SHALL provide a control to enable it. When the permission is granted, the Home screen SHALL display a granted indicator. The displayed status SHALL reflect the current OS permission state, including changes made from system settings while the app was backgrounded.
