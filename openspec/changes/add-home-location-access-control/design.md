@@ -3,7 +3,7 @@
 See proposal.md — Why. Technical constraints shaping the approach:
 
 - `HomeScreen.kt` today owns both launchers (`RequestPermission` chained before `OpenDocument`) and caches the grant result in `remember { mutableStateOf(checkSelfPermission(...)) }`, updated only by the launcher callback. A persistent status display must not go stale when the user grants/revokes from system settings.
-- On Android 13+ the framework may stop showing the permission dialog after repeated denials; `requestPermissions` then resolves `false` with no UI. `shouldShowRequestPermissionRationale` distinguishes "declined, retry worth it" from "suppressed".
+- On Android 13+ the framework may stop showing the permission dialog after repeated denials; `requestPermissions` then resolves `false` with no UI. The app cannot distinguish this silent auto-deny from a visible denial inside the result callback.
 - The pick path itself (`pickVideo.launch(arrayOf("video/*"))` → `viewModel.onVideoPicked(uri)`) is unchanged; only the pre-pick permission branch and the post-denial `Text` are removed from it.
 - `lifecycle-runtime-compose` is already an `:app` dependency, so resume-aware permission checks need no new dependency.
 - Test surface: `E2eCutTest` is the only instrumented test that drives `HomeScreen`; it grants `ACCESS_MEDIA_LOCATION` via `GrantPermissionRule` and locates the button with exact-match `onNodeWithText("Pick video")`.
@@ -13,7 +13,7 @@ See proposal.md — Why. Technical constraints shaping the approach:
 **Goals:**
 - One file changed (`HomeScreen.kt`); no ViewModel, engine, manifest, dependency, or test-source changes.
 - Permission state in the UI is derived from `checkSelfPermission` re-evaluated on lifecycle resume, not from launcher callbacks.
-- The Enable button never produces a dead tap: request when the OS can show a dialog, app-settings intent when it cannot.
+- The Enable button has exactly one behavior: issue the permission request. No settings hand-off, no suppression heuristics.
 
 **Non-Goals:**
 - No gating of "Pick video" on any permission (explored and deliberately rejected — denial degrades output, never blocks).
@@ -29,11 +29,13 @@ See proposal.md — Why. Technical constraints shaping the approach:
 
 *Alternative:* keep today's `remember` snapshot written only by the launcher — rejected: the persistent granted/off line must survive a Settings round-trip (spec scenario "Status reflects a system settings change").
 
-### D2 — One Enable button, two behaviors, no separate "Open settings" button
+### D2 — Enable button always issues the request; never navigates to settings
 
-Click handler: if not yet asked this session, or `shouldShowRequestPermissionRationale(activity)` is true → `requestPermission.launch(ACCESS_MEDIA_LOCATION)`. If asked once and rationale is now false (dialog suppressed / silently auto-denied) → `ACTION_APPLICATION_DETAILS_SETTINGS` intent with `package:` URI.
+Every activation of the Enable button calls `requestPermission.launch(ACCESS_MEDIA_LOCATION)` and nothing else. While the OS is suppressing its dialog (post-lockout) the tap resolves `false` with no visible dialog — accepted: the status panel continues to report the truth, and the block decays (inactivity, process restart) so the dialog eventually returns.
 
-*Alternative:* always open settings — rejected: the first "yes" tap should produce the standard one-tap system dialog, not a settings maze. *Alternative:* always request — rejected: after lockout every tap would silently resolve `false` with no UI, indistinguishable from a broken button. The one-button form stays honest in both phases.
+*Alternative:* detect suppression via `permissionRequestedOnce && !shouldShowRequestPermissionRationale(activity)` and route the user to `ACTION_APPLICATION_DETAILS_SETTINGS` — implemented once, then **deliberately removed at user direction**: extra state, an OEM-shaky heuristic, and an app→Settings hand-off, all to serve the rare repeated-denial corner. A silent no-dialog tap is a smaller wrong than leaving the app unexpectedly.
+
+*Alternative:* attempt the request and open settings when it comes back denied — impossible to implement honestly: a silent auto-deny and a visible denial are indistinguishable in the callback (both are `false` with no provenance), so this would yank users to Settings on their first explicit "Don't allow".
 
 ### D3 — Granted line is inert text
 
@@ -57,7 +59,9 @@ The red "GPS location may not be preserved" `Text` and the `RequestPermission` b
 
 **[Risk] `GrantPermissionRule` masks the off-state in instrumented tests** — `E2eCutTest` always sees the granted line. Accepted (documented gap since 2026-08-23); the off-state panel and settings fallback are verified manually on device. The test's exact-text match on "Pick video" remains unique because the new copy ("Enable media location access") does not contain that string.
 
-**[Risk] OEM variance in how the silent-deny heuristic behaves** (`shouldShowRequestPermissionRationale` semantics differ slightly on some ROMs) — worst case a tap opens settings when a dialog was still possible, which is a recoverable wrong turn, not a dead end.
+**[Risk] Dead taps while the OS suppresses the dialog** — after repeated denials the Enable button produces no dialog until the suppression decays (inactivity or process restart). Accepted by explicit user decision: the always-visible status line keeps reporting "off", the app never dead-ends hostilely, and the alternative (settings routing) was judged over-complicated.
+
+**[Risk] OEM variance in when the OS suppresses its dialog** — irrelevant to correctness now: the app always issues the request and the OS decides whether to render a dialog; the status display reads only `checkSelfPermission`.
 
 **[Risk] Status line reads as noise to users who intentionally run GPS-free workflows** — accepted; it is one short line, and the app's promise is metadata preservation.
 

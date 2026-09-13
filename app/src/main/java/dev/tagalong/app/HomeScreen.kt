@@ -1,14 +1,9 @@
 package dev.tagalong.app
 
 import android.Manifest
-import android.app.Activity
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -125,32 +120,15 @@ fun HomeScreen(navController: NavController, viewModel: CutViewModel) {
 
     // The Enable button's request path.  Results only update the status state; nothing is
     // chained onto it — the pick flow is independent of the permission by design.
-    var permissionRequestedOnce by remember { mutableStateOf(false) }
+    //
+    // Single behavior (design D2, revised): always issue the request, never navigate to
+    // settings.  While the OS silently auto-denies (after repeated declines) a tap shows no
+    // dialog — accepted: the status line keeps reporting the truth and the suppression
+    // decays with inactivity or a process restart, so the dialog eventually returns.
     val requestLocationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        permissionRequestedOnce = true
         locationPermissionGranted = granted
-    }
-
-    // Dual behavior (design D2): fire the system request while a dialog is still possible;
-    // once the OS has silently auto-denied further requests (rationale false after a decline),
-    // route the user to app-detail settings instead of producing a dead tap with no dialog.
-    val enableLocationAccess: () -> Unit = {
-        val activity = context as? Activity
-        if (activity != null && permissionRequestedOnce &&
-            !ActivityCompat.shouldShowRequestPermissionRationale(
-                activity, Manifest.permission.ACCESS_MEDIA_LOCATION
-            )
-        ) {
-            val intent = Intent(
-                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.fromParts("package", context.packageName, null)
-            )
-            context.startActivity(intent)
-        } else {
-            requestLocationPermission.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
-        }
     }
 
     Column(
@@ -225,7 +203,11 @@ fun HomeScreen(navController: NavController, viewModel: CutViewModel) {
                         // the app's primary action ("Pick video" stays the filled button).
                         OutlinedButton(
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = enableLocationAccess,
+                            onClick = {
+                                requestLocationPermission.launch(
+                                    Manifest.permission.ACCESS_MEDIA_LOCATION
+                                )
+                            },
                         ) {
                             Text("Enable media location access")
                         }

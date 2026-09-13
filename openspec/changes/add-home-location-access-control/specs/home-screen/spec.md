@@ -19,7 +19,7 @@ The Home screen SHALL display the current media location (`ACCESS_MEDIA_LOCATION
 - **THEN** the displayed status matches the new permission state without requiring an app restart
 
 ### Requirement: Media location access is requested only from the Home screen
-The runtime permission request for `ACCESS_MEDIA_LOCATION` SHALL be triggered only by the Home screen's enable control. Picking a video, trimming, and cutting SHALL never trigger a permission request and SHALL never be blocked by the permission state; the "Pick video" control SHALL always be enabled. When the OS no longer shows its permission dialog for a pending request, activating the enable control SHALL instead open the app's system settings page so the user can grant the permission there.
+The runtime permission request for `ACCESS_MEDIA_LOCATION` SHALL be triggered only by the Home screen's enable control. Activating that control SHALL issue the permission request and SHALL NOT navigate away from the app. Picking a video, trimming, and cutting SHALL never trigger a permission request and SHALL never be blocked by the permission state; the "Pick video" control SHALL always be enabled. While the OS is suppressing its permission dialog, activating the enable control MAY produce no visible dialog; the displayed permission status SHALL continue to reflect the real permission state.
 
 #### Scenario: Pick flow never prompts for permission
 - **WHEN** the user taps "Pick video" and `ACCESS_MEDIA_LOCATION` is not granted
@@ -27,10 +27,12 @@ The runtime permission request for `ACCESS_MEDIA_LOCATION` SHALL be triggered on
 - **AND** the picked video proceeds through trim and cut normally
 
 #### Scenario: Enable control requests the permission
-- **WHEN** the user activates "Enable media location access" and the OS can show a permission dialog
-- **THEN** the system permission dialog for media location access is shown
+- **WHEN** the user activates "Enable media location access" and `ACCESS_MEDIA_LOCATION` is not granted
+- **THEN** the app issues the `ACCESS_MEDIA_LOCATION` permission request
+- **AND** the app does not navigate to system settings
 
-#### Scenario: Enable control falls back to app settings when the dialog is suppressed
-- **WHEN** the user has already declined the permission such that the OS silently auto-denies further requests
+#### Scenario: Suppressed dialog leaves state unchanged
+- **WHEN** the OS has silently auto-denied further `ACCESS_MEDIA_LOCATION` requests
 - **AND** the user activates "Enable media location access"
-- **THEN** the app opens its system app-details settings page instead of issuing a request whose dialog would never appear
+- **THEN** no permission dialog is shown
+- **AND** the Home screen still reports media location access as off

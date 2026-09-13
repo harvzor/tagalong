@@ -2,7 +2,7 @@
 
 - [x] 1.1 Add resume-lifecycle permission state: evaluate `checkSelfPermission(ACCESS_MEDIA_LOCATION)` on each lifecycle resume (via `LocalLifecycleOwner` observer; `lifecycle-runtime-compose` already a dependency) so the UI reflects grant/revoke made in system settings
 - [x] 1.2 Add the media-location block above the "Pick video" button: off-state = heading "Media location access is off" + mechanism-only copy ("GPS coordinates are stored inside your video files. Without permission to read them, Android strips GPS from every cut.") + "Enable media location access" button; on-state = inert line "📍 Media location access granted ✓" (no enable control, no warning, not clickable)
-- [x] 1.3 Implement the Enable button's dual behavior (design D2): `RequestPermission(ACCESS_MEDIA_LOCATION)` while a dialog is possible; after a first declined request when `shouldShowRequestPermissionRationale` is false, launch `ACTION_APPLICATION_DETAILS_SETTINGS` with the `package:` URI instead
+- [x] 1.3 Enable button has a single behavior: always `RequestPermission(ACCESS_MEDIA_LOCATION)`; no rationale heuristic, no settings navigation (design D2, revised)
 - [x] 1.4 Simplify the pick path: "Pick video" always enabled, `onClick` calls `pickVideo.launch(arrayOf("video/*"))` directly; delete the `RequestPermission` branch in `launchPick`, the now-unused chaining state, and the red "GPS location may not be preserved" warning `Text`
 - [x] 1.5 Update the long WHY comment on the pick launchers to describe the new choreography (permission owned by the Home control; picker untouched rationale unchanged)
 
@@ -17,7 +17,7 @@
 - [ ] 3.1 Fresh install (permission not yet granted): Home shows the off panel above an enabled "Pick video"; tapping "Pick video" opens the system picker with **no** location dialog; a cut completes (location absent from output ProbeCard, as expected)
 - [ ] 3.2 Tap "Enable media location access" → system dialog appears → Allow → status line flips to "📍 Media location access granted ✓" and the panel disappears; a subsequent cut of a GPS-bearing sample preserves location (ProbeCard shows it)
 - [ ] 3.3 From the granted state, revoke via system settings and background/foreground the app → status reverts to the off panel without app restart (validates 1.1)
-- [ ] 3.4 Deny twice until the OS silently auto-denies, then tap "Enable media location access" → app-details settings page opens instead of a dead dialog (validates D2 fallback)
+- [ ] 3.4 After repeated denials put the OS in silent auto-deny: tapping "Enable media location access" shows no dialog and does nothing visible — verify no crash and status stays "off"; force-restart the app and confirm the dialog is offered again
 
 ## 4. Spec & doc hygiene
 

@@ -9,7 +9,7 @@ Today the app requests `ACCESS_MEDIA_LOCATION` lazily on the "Pick video" tap, i
   - When granted: an inert status line "📍 Media location access granted ✓" (not tappable; revocation stays in system settings).
 - The "Pick video" button **never requests any permission** — it always launches the picker directly and is always enabled (a denial degrades output quality; it never blocks the feature).
 - **BREAKING** (behavioral): the "request permission before launching the picker" choreography and the one-time post-denial warning are removed, replaced by the persistent Home-screen status.
-- If the system has silently auto-denied further requests (post-lockout), the Enable button routes to the app's system settings page instead of firing a request whose dialog will never appear.
+- The Enable button always issues the `ACCESS_MEDIA_LOCATION` request and never leaves the app. A previously-designed fallback that routed the user to the system app-settings page after the OS entered silent auto-denial was deliberately removed as over-complicated for a rare corner: while the OS is suppressing the dialog the tap simply produces no dialog, and the persistent status line continues to tell the truth.
 
 ## Capabilities
 
@@ -19,7 +19,7 @@ _(none)_
 
 ### Modified Capabilities
 
-- `home-screen`: new requirement — the Home screen displays the media-location permission status at all times and provides an explicit control to grant it; the permission ask is owned solely by this control.
+- `home-screen`: new requirement — the Home screen displays the media-location permission status at all times and provides an explicit control that issues the permission request; the permission ask is owned solely by this control and never navigates to system settings.
 - `cut-workflow`: the `ACCESS_MEDIA_LOCATION` requirement's request-policy paragraph is replaced — the permission is requested only from the Home-screen control, never during the pick flow; picking and cutting are never blocked by permission state; the persistent status line replaces the one-time denial warning.
 
 ## Impact
