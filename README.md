@@ -4,19 +4,17 @@
   <img src="icon.png" alt="Film real over a hash icon" width="300">
 </p>
 
-<p align="center"><em>Trim videos - your metadata comes along.</em></p>
+<p align="center"><em>Trim clips, not context.</em></p>
 
 ---
 
-When you trim a clip in a typical mobile editor, the output loses the date it was shot, the GPS coordinates, and the camera information the phone recorded. The video is fine; the record of when and where it happened is gone. The gallery then files it under today's date, and the original context is unrecoverable.
+## What Tagalong is
 
-Tagalong fixes that one problem.
+Tagalong lets you trim mobile clips while seamlessly preserving their original timestamps, camera info, and GPS data.
 
-## What Tagalong doesn't do
+## Why?
 
-- No multi-track timeline
-- No filters, transitions, stickers, or music
-- No account, no cloud, no export watermark
+Standard video editors wipe a clip’s original date and location the moment you edit it, forcing it to the top of today’s gallery. Tagalong lets you trim long videos down to the best moments while keeping their place in your timeline intact.
 
 ## What gets preserved
 
@@ -28,15 +26,23 @@ Tagalong fixes that one problem.
 | **Orientation**        | Portrait clips stay portrait, with rotation properly signalled rather than baked into the frames                          |
 | **Gallery date**       | The date your gallery displays — stored separately from container metadata, and the thing most editors silently get wrong |
 
+## What Tagalong doesn't do
+
+- No multi-track timeline
+- No filters, transitions, stickers, or music
+- No account, no cloud, no export watermark
+
 ## How It Works
 
-Tagalong uses FFmpeg to copy the video and audio streams without re-encoding, with options that carry all container tags through to the output unchanged. Cuts snap to the nearest keyframe — an inherent constraint of lossless cutting that the app surfaces rather than hides.
+Tagalong doesn't edit the original file - instead it non-destructively creates a new file but tries to preserve as much metadata as possible.
 
-Files are selected via `ACTION_OPEN_DOCUMENT` rather than the Android Photo Picker. The Photo Picker can strip GPS from the bytes it gives an app, replace the real filename with an internal numeric ID, and omit the gallery-relative path. `ACTION_OPEN_DOCUMENT` gives Tagalong direct, persistent access to the one file the user explicitly selected, so the original bytes and their metadata can be read.
+### Under the Hood
 
-You can also skip the picker entirely: select a video in your gallery and **share it to Tagalong** — the app opens straight at the trim screen with that video loaded. A cut preserves every tag present in the file the sending app hands over; if a sender strips metadata before sharing (some galleries share a privacy-copy without location), the result screen's metadata diff shows that honestly on the source side.
+Tagalong uses FFmpeg to copy the video and audio streams without re-encoding - the trick to keeping the metadata is to use the `map_metadata` to get FFmpeg to do most of the heavy lifting.
 
-There is one more subtlety to GPS preservation: an MP4 can store a logical location in different physical forms. Device-originated videos may carry the gallery-compatible QuickTime `moov/udta/©xyz` atom, while FFprobe can normalize that and a generic `mdta/location` entry to the same logical `location` tag. A logical FFprobe value alone is therefore not enough to prove compatibility; Tagalong preserves and checks the raw `©xyz` representation because gallery applications such as Google Photos may ignore the generic form. Both canonical device samples in this repository contain the QuickTime location atom, although their coordinates are intentionally not documented here.
+One thing to note is that FFmpeg, when copying location data, doesn't distinguish between if the GPS metadata is stored at `moov/udta/©xyz` or `mdta/location` - whereas Google Photos only reads it from the former. Tagalong makes a special effort to preserve this metadata.
+
+Files are selected via `ACTION_OPEN_DOCUMENT` rather than the Android Photo Picker. The Photo Picker, for privacy reasons, strips the GPS information before it hands files to the app. `ACTION_OPEN_DOCUMENT` gives Tagalong direct, persistent access to the one file the user explicitly selected, so the original bytes and their metadata can be read.
 
 ## Install
 
@@ -150,5 +156,3 @@ gh secret set RELEASE_KEYSTORE_PASSWORD --body "<store-password>"
 gh secret set RELEASE_KEY_ALIAS --body "release"
 gh secret set RELEASE_KEY_PASSWORD --body "<key-password>"
 ```
-
-> **Keep the keystore safe.** If it is lost, APKs signed with a new keystore will be treated by Android as a different app — existing users will need to uninstall and reinstall.
