@@ -10,7 +10,7 @@
 
 ## What Tagalong is
 
-Tagalong lets you trim mobile clips while seamlessly preserving their original timestamps, camera info, and GPS data.
+Tagalong lets you trim mobile clips without losing the original timestamps, camera info, and GPS data.
 
 ## Why?
 
@@ -26,7 +26,7 @@ Standard video editors wipe a clip’s original date and location the moment you
 | **Orientation**        | Portrait clips stay portrait, with rotation properly signalled rather than baked into the frames                          |
 | **Gallery date**       | The date your gallery displays — stored separately from container metadata, and the thing most editors silently get wrong |
 
-## What Tagalong doesn't do
+## What Tagalong isn't
 
 - No multi-track timeline
 - No filters, transitions, stickers, or music
