@@ -1,6 +1,10 @@
 # Tagalong: Android Video Cutter
 
-*Trim and convert video. Your metadata comes along.*
+<p align="center">
+  <img src="icon.png" alt="Film real over a hash icon" width="300">
+</p>
+
+<p align="center"><em>Trim videos - your metadata comes along.</em></p>
 
 ---
 
