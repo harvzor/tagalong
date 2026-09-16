@@ -12,8 +12,38 @@
     -->
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
 
+    <!--
+        Launcher identity. The mark is the Tagalong hashtag-and-film-reel; the label is the
+        functional name. See the `launcher-identity` spec — both are the app's identity on surfaces
+        the app itself never draws.
+
+        android:icon is load-bearing and easy to lose. Without it every resource under
+        res/mipmap-*/ is dead weight and the platform silently renders its default app icon: the
+        full Image Asset export shipped committed, referenced by nothing, green. The failure is
+        quiet — no build error, no crash, no lint error — so LauncherIdentityTest guards it via
+        ApplicationInfo.icon, which is 0 while this attribute is absent.
+
+        There is deliberately NO <monochrome> layer in either adaptive-icon XML, and re-running
+        Android Studio's Image Asset will put one back: as long as its Monochrome page is
+        populated, Image Asset re-emits the element pointing at the colour foreground. That is the
+        regression this comment exists for. The monochrome slot is a contract that its artwork is
+        single-colour on transparent, because themed-icon launchers take that layer's alpha and
+        flood it with the system accent colour. This mark is five-colour artwork with heavy dark
+        outlines, so declaring it would claim a themed-icon capability the artwork does not
+        support — the film reel disappears into the hashtag silhouette as one flat accent blob.
+        An undeclared layer is an unclaimed capability; a fake one is a false claim. With no
+        monochrome layer, themed launchers apply their own derived treatment to this icon.
+        If AGP's MonochromeLauncherIcon warning bothers you, suppress it; do not restore the
+        element. See openspec/changes/add-launcher-icon/design.md, Decision 1.
+
+        android:roundIcon cannot be asserted at runtime — ApplicationInfo exposes no public
+        roundIcon field — and `aapt2 dump badging` does not report it either. It is verified with
+        `aapt2 dump xmltree` over AndroidManifest.xml, which shows both attributes resolved.
+    -->
     <application
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Tagalong">
