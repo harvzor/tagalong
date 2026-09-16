@@ -156,3 +156,16 @@ gh secret set RELEASE_KEYSTORE_PASSWORD --body "<store-password>"
 gh secret set RELEASE_KEY_ALIAS --body "release"
 gh secret set RELEASE_KEY_PASSWORD --body "<key-password>"
 ```
+
+## App Icon
+
+The launcher icon source image is `icon.png` in the repo root (transparent background). To regenerate or update it:
+
+1. Replace `icon.png` with the new source image
+2. In Android Studio, right-click `app/src/main/res/` → **New → Image Asset**
+3. **Icon Type**: Launcher Icons (Adaptive and Legacy)
+4. **Foreground Layer**: select `icon.png`; adjust the resize slider so the character fits within the safe zone circle
+5. **Background Layer**: Color → `#FFFFFF` (white)
+6. Click **Next → Finish** — this overwrites all `mipmap-*` directories automatically
+
+The manifest already references `@mipmap/ic_launcher` and `@mipmap/ic_launcher_round`, so no manifest changes are needed after regenerating.
