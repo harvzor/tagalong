@@ -50,9 +50,10 @@ Download the latest APK from [GitHub Releases](https://github.com/harvzor/tagalo
 
 ## Permissions
 
-| Permission                | Why                                                                                                                                                                                                                                                                                                                                                                                                              |
-|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **ACCESS_MEDIA_LOCATION** | Android's media framework strips GPS location tags from any `openInputStream` call made without this permission — whether the video was picked in-app via `ACTION_OPEN_DOCUMENT` or shared in from your gallery. This permission ensures Tagalong receives an unredacted byte stream for the file you explicitly selected. It is used exclusively to read location that is already embedded in that file; the app has no analytics, no network calls, and no backend. |
+| Permission                | Why                                                                                                                                                                                        |
+|---------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **ACCESS_MEDIA_LOCATION** | Allows Tagalong to read the location (GPS data) of a media file. Without it this permission being given, Android strips location data from media files before Tagalong ever sees the file. |
+| ~~INTERNET~~              | Tagalong does not have access to the internet - the app has no analytics, no network calls, and no backend.                                                                                |
 
 ## Building
 
