@@ -32,6 +32,15 @@ Standard video editors wipe a clip’s original date and location the moment you
 - No filters, transitions, stickers, or music
 - No account, no cloud, no export watermark
 
+## Feature comparison
+
+| App           | Can losslessly cut? | Can re-encode? | Preserves metadata? | Opensource? |
+|---------------|---------------------|----------------|---------------------|-------------|
+| Tagalong      | ✅                   | ❌              | ✅                   | ✅           |
+| Google Photos | ❌                   | ✅              | ✅                   | ❌           |
+
+You can see a deeper comparison in the [comparisons](./comparisons) folder.
+
 ## How It Works
 
 Tagalong doesn't edit the original file - instead it non-destructively creates a new file but tries to preserve as much metadata as possible.
