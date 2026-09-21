@@ -2,7 +2,7 @@
 
 **Measured:** 2026-09-18
 **App under test:** Google Photos `7.67.0.882706237` (`com.google.android.apps.photos`)
-**Device:** Android 17 (API 37) emulator `Medium_Phone`, `sdk_gphone16k_arm64`
+**Device:** Emulator `Medium_Phone`, `sdk_gphone16k_arm64`, Android 17 (API 37) 
 **Instruments:** exiftool `13.55`
 
 ---

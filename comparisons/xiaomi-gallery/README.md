@@ -2,7 +2,7 @@
 
 **Measured:** 2026-09-21
 **App under test:** Xiaomi Gallery `3.8.0.8-global` (`com.miui.gallery`)
-**Device:** POCO X5 Pro 5G, Xiaomi HyperOS 2.0.14.0
+**Device:** POCO X5 Pro 5G, Android 14, Xiaomi HyperOS 2.0.14.0
 **Instruments:** exiftool `13.55`
 
 ---
