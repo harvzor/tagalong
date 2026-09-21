@@ -34,12 +34,13 @@ Standard video editors wipe a clip’s original date and location the moment you
 
 ## Feature comparison
 
-| App           | Can losslessly cut? | Can re-encode? | Preserves metadata? | Opensource? |
-|---------------|---------------------|----------------|---------------------|-------------|
-| Tagalong      | ✅                   | ❌              | ✅                   | ✅           |
-| Google Photos | ❌                   | ✅              | ✅                   | ❌           |
+| App            | Can losslessly cut? | Can re-encode? | Preserves creation date? | Preserves GPS location? | Opensource? |
+|----------------|---------------------|----------------|--------------------------|-------------------------|-------------|
+| Tagalong       | ✅                   | ❌              | ✅                        | ✅                       | ✅           |
+| Google Photos  | ❌                   | ✅              | ✅                        | ✅                       | ❌           |
+| Xiaomi Gallery | ❌                   | ✅              | ❌                        | ❌                       | ❌           |
 
-You can see a deeper comparison in the [comparisons](./comparisons) folder.
+There are deeper comparisons in the [comparisons](./comparisons) folder.
 
 ## How It Works
 

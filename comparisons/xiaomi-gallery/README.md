@@ -1,0 +1,165 @@
+# Google Photos
+
+**Measured:** 2026-09-21
+**App under test:** Xiaomi Gallery `3.8.0.8-global` (`com.miui.gallery`)
+**Device:** POCO X5 Pro 5G, Xiaomi HyperOS 2.0.14.0
+**Instruments:** exiftool `13.55`
+
+---
+
+## Diff
+
+```diff
+ [ExifTool]      ExifTool Version Number         : 13.55
+-[File:System]   File Name                       : gallery-cut.mp4
+-[File:System]   Directory                       : ../sample-videos
+-[File:System]   File Size                       : 12 MB
+-[File:System]   File Modification Date/Time     : 2026:09:05 13:20:54+02:00
+-[File:System]   File Access Date/Time           : 2026:09:13 22:20:23+02:00
+-[File:System]   File Inode Change Date/Time     : 2026:09:05 13:20:54+02:00
++[File:System]   File Name                       : gallery-cut.mp4
++[File:System]   Directory                       : xiaomi-gallery
++[File:System]   File Size                       : 4.0 MB
++[File:System]   File Modification Date/Time     : 2026:09:21 23:37:23+02:00
++[File:System]   File Access Date/Time           : 2026:09:21 23:45:05+02:00
++[File:System]   File Inode Change Date/Time     : 2026:09:21 23:39:22+02:00
+ [File:System]   File Permissions                : -rw-r--r--
+ [File]          File Type                       : MP4
+ [File]          File Type Extension             : mp4
+
+ [QuickTime]     Major Brand                     : MP4 v2 [ISO 14496-14]
+ [QuickTime]     Minor Version                   : 0.0.0
+ [QuickTime]     Compatible Brands               : isom, mp42
+-[QuickTime]     Free                            : (Binary data 3321 bytes, use -b option to extract)
+-[QuickTime]     Free                            : (Binary data 402067 bytes, use -b option to extract)
+-[QuickTime]     Media Data Size                 : 10367972
+-[QuickTime]     Media Data Offset               : 405444
+-[QuickTime]     Media Data                      : (Binary data 10367972 bytes, use -b option to extract)
+ [QuickTime]     Movie Header Version            : 0
+-[QuickTime]     Create Date                     : 2026:08:09 21:39:47
+-[QuickTime]     Modify Date                     : 2026:08:09 21:39:47
++[QuickTime]     Create Date                     : 2026:09:21 21:34:46
++[QuickTime]     Modify Date                     : 2026:09:21 21:34:46
+ [QuickTime]     Time Scale                      : 10000
+-[QuickTime]     Duration                        : 4.89 s
++[QuickTime]     Duration                        : 1.88 s
+ [QuickTime]     Preferred Rate                  : 1
+ [QuickTime]     Preferred Volume                : 100.00%
+ [QuickTime]     Matrix Structure                : 1 0 0 0 1 0 0 0 1
+
+ [QuickTime]     Current Time                    : 0 s
+ [QuickTime]     Next Track ID                   : 3
+ [QuickTime]     Handler Type                    : Metadata Tags
+-[QuickTime:UserData] GPS Coordinates            : 52 deg 31' 5.52" N, 13 deg 24' 23.04" E
+-[QuickTime:UserData] Preview Image              : (Binary data 886319 bytes, use -b option to extract)
++[QuickTime]     Free                            : (Binary data 1338 bytes, use -b option to extract)
++[QuickTime]     Media Data Size                 : 4006495
++[QuickTime]     Media Data Offset               : 3288
++[QuickTime]     Media Data                      : (Binary data 4006495 bytes, use -b option to extract)
+ [QuickTime:Keys] Android Version                : 14
+-[QuickTime:Keys] Android Make                   : Xiaomi
+-[QuickTime:Keys] Android Model                  : 22101320G
+-[QuickTime:Keys] Xiaomi Product Marketname      : POCO X5 Pro 5G
+ [QuickTime:Keys] Video File Type                : (Binary data 4 bytes, use -b option to extract)
+ [QuickTime:Track1] Track Header Version         : 0
+-[QuickTime:Track1] Track Create Date            : 2026:08:09 21:39:47
+-[QuickTime:Track1] Track Modify Date            : 2026:08:09 21:39:47
++[QuickTime:Track1] Track Create Date            : 2026:09:21 21:34:46
++[QuickTime:Track1] Track Modify Date            : 2026:09:21 21:34:46
+ [QuickTime:Track1] Track ID                     : 1
+-[QuickTime:Track1] Track Duration               : 4.89 s
++[QuickTime:Track1] Track Duration               : 1.87 s
+ [QuickTime:Track1] Track Layer                  : 0
+ [QuickTime:Track1] Track Volume                 : 0.00%
+-[QuickTime:Track1] Matrix Structure             : 0 1 0 -1 0 0 0 0 1
+-[QuickTime:Track1] Image Width                  : 1920
+-[QuickTime:Track1] Image Height                 : 1080
+-[QuickTime:Track1] Unknown edts                 : (Binary data 40 bytes, use -b option to extract)
++[QuickTime:Track1] Matrix Structure             : 1 0 0 0 1 0 0 0 1
++[QuickTime:Track1] Image Width                  : 1080
++[QuickTime:Track1] Image Height                 : 1920
+ [QuickTime:Track1] Media Header Version         : 0
+-[QuickTime:Track1] Media Create Date            : 2026:08:09 21:39:47
+-[QuickTime:Track1] Media Modify Date            : 2026:08:09 21:39:47
++[QuickTime:Track1] Media Create Date            : 2026:09:21 21:34:46
++[QuickTime:Track1] Media Modify Date            : 2026:09:21 21:34:46
+ [QuickTime:Track1] Media Time Scale             : 90000
+-[QuickTime:Track1] Media Duration               : 4.89 s
++[QuickTime:Track1] Media Duration               : 1.87 s
+ [QuickTime:Track1] Handler Type                 : Video Track
+ [QuickTime:Track1] Handler Description          : VideoHandle
+ [QuickTime:Track1] Graphics Mode                : srcCopy
+ [QuickTime:Track1] Op Color                     : 0 0 0
+ [QuickTime:Track1] Compressor ID                : avc1
+-[QuickTime:Track1] Source Image Width           : 1920
+-[QuickTime:Track1] Source Image Height          : 1080
++[QuickTime:Track1] Source Image Width           : 1080
++[QuickTime:Track1] Source Image Height          : 1920
+ [QuickTime:Track1] X Resolution                 : 72
+ [QuickTime:Track1] Y Resolution                 : 72
+ [QuickTime:Track1] Bit Depth                    : 24
+-[QuickTime:Track1] AVC Configuration            : (Binary data 35 bytes, use -b option to extract)
++[QuickTime:Track1] AVC Configuration            : (Binary data 33 bytes, use -b option to extract)
+ [QuickTime:Track1] Color Profiles               : nclx
+ [QuickTime:Track1] Color Primaries              : BT.709
+ [QuickTime:Track1] Transfer Characteristics     : BT.709
+ [QuickTime:Track1] Matrix Coefficients          : BT.709
+ [QuickTime:Track1] Video Full Range Flag        : Limited
+-[QuickTime:Track1] Video Frame Rate             : 29.931
+-[QuickTime:Track1] Sync Sample Table            : (Binary data 28 bytes, use -b option to extract)
+-[QuickTime:Track1] Sample Sizes                 : (Binary data 596 bytes, use -b option to extract)
+-[QuickTime:Track1] Sample To Chunk              : (Binary data 56 bytes, use -b option to extract)
+-[QuickTime:Track1] Chunk Offset 64              : (Binary data 48 bytes, use -b option to extract)
++[QuickTime:Track1] Video Frame Rate             : 30
++[QuickTime:Track1] Sync Sample Table            : (Binary data 16 bytes, use -b option to extract)
++[QuickTime:Track1] Sample Sizes                 : (Binary data 236 bytes, use -b option to extract)
++[QuickTime:Track1] Sample To Chunk              : (Binary data 32 bytes, use -b option to extract)
++[QuickTime:Track1] Chunk Offset 64              : (Binary data 24 bytes, use -b option to extract)
+ [QuickTime:Track2] Track Header Version         : 0
+-[QuickTime:Track2] Track Create Date            : 2026:08:09 21:39:47
+-[QuickTime:Track2] Track Modify Date            : 2026:08:09 21:39:47
++[QuickTime:Track2] Track Create Date            : 2026:09:21 21:34:46
++[QuickTime:Track2] Track Modify Date            : 2026:09:21 21:34:46
+ [QuickTime:Track2] Track ID                     : 2
+-[QuickTime:Track2] Track Duration               : 4.80 s
++[QuickTime:Track2] Track Duration               : 1.88 s
+ [QuickTime:Track2] Track Layer                  : 0
+ [QuickTime:Track2] Track Volume                 : 100.00%
+ [QuickTime:Track2] Matrix Structure             : 1 0 0 0 1 0 0 0 1
++[QuickTime:Track2] Unknown edts                 : (Binary data 40 bytes, use -b option to extract)
+ [QuickTime:Track2] Media Header Version         : 0
+-[QuickTime:Track2] Media Create Date            : 2026:08:09 21:39:47
+-[QuickTime:Track2] Media Modify Date            : 2026:08:09 21:39:47
+-[QuickTime:Track2] Media Time Scale             : 48000
+-[QuickTime:Track2] Media Duration               : 4.80 s
++[QuickTime:Track2] Media Create Date            : 2026:09:21 21:34:46
++[QuickTime:Track2] Media Modify Date            : 2026:09:21 21:34:46
++[QuickTime:Track2] Media Time Scale             : 44100
++[QuickTime:Track2] Media Duration               : 1.88 s
+ [QuickTime:Track2] Handler Type                 : Audio Track
+ [QuickTime:Track2] Handler Description          : SoundHandle
+ [QuickTime:Track2] Balance                      : 0
+ [QuickTime:Track2] Audio Format                 : mp4a
+ [QuickTime:Track2] Audio Channels               : 2
+ [QuickTime:Track2] Audio Bits Per Sample        : 16
+-[QuickTime:Track2] Audio Sample Rate            : 48000
++[QuickTime:Track2] Audio Sample Rate            : 44100
+ [QuickTime:Track2] Unknown esds                 : (Binary data 31 bytes, use -b option to extract)
+ [QuickTime:Track2] Time To Sample Table         : (Binary data 16 bytes, use -b option to extract)
+-[QuickTime:Track2] Sample Sizes                 : (Binary data 912 bytes, use -b option to extract)
+-[QuickTime:Track2] Sample To Chunk              : (Binary data 44 bytes, use -b option to extract)
+-[QuickTime:Track2] Chunk Offset 64              : (Binary data 48 bytes, use -b option to extract)
+-[Composite]     Image Size                      : 1920x1080
++[QuickTime:Track2] Sample Sizes                 : (Binary data 336 bytes, use -b option to extract)
++[QuickTime:Track2] Sample To Chunk              : (Binary data 32 bytes, use -b option to extract)
++[QuickTime:Track2] Chunk Offset 64              : (Binary data 24 bytes, use -b option to extract)
++[Composite]     Image Size                      : 1080x1920
+ [Composite]     Megapixels                      : 2.1
+ [Composite]     Avg Bitrate                     : 17 Mbps
+-[Composite]     GPS Latitude                    : 52 deg 31' 5.52" N
+-[Composite]     GPS Longitude                   : 13 deg 24' 23.04" E
+-[Composite]     Rotation                        : 90
+-[Composite]     GPS Position                    : 52 deg 31' 5.52" N, 13 deg 24' 23.04" E
+\ No newline at end of file
++[Composite]     Rotation                        : 0
+```
