@@ -54,6 +54,8 @@ One thing to note is that FFmpeg, when copying location data, doesn't distinguis
 
 Files are selected via `ACTION_OPEN_DOCUMENT` rather than the Android Photo Picker. The Photo Picker, for privacy reasons, strips the GPS information before it hands files to the app. `ACTION_OPEN_DOCUMENT` gives Tagalong direct, persistent access to the one file the user explicitly selected, so the original bytes and their metadata can be read.
 
+Other [solutions](./docs/solutions.md) were considered.
+
 ## Install
 
 Download the latest APK from [GitHub Releases](https://github.com/harvzor/tagalong/releases) and install it on your phone.
