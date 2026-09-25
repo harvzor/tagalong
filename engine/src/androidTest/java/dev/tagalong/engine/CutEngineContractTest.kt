@@ -113,6 +113,50 @@ abstract class CutEngineContractTest {
             ),
         )
 
+        // Requirement: Location is carried exactly once, as the source wrote it
+        // (change cut-command-honesty). These assertions are driven by each source's own
+        // location representation, so every discovered fixture participates with no
+        // registration change, and the identical code runs in both modes.
+
+        // Absence of invention: the cut must never write a 3GPP LocationInformation (loci)
+        // box that the source did not already carry. The engine suppresses ffmpeg's location
+        // mistranslation at the dictionary (see FfmpegCutEngine), so mov_write_loci_tag bails.
+        if (!sourceProbe.locationRepresentation.hasThreeGppLocationBox) {
+            assertTrue(
+                "[$label] output invented a 3GPP loci box absent from the source",
+                !outputProbe.locationRepresentation.hasThreeGppLocationBox,
+            )
+        }
+
+        if (sourceProbe.locationRepresentation.hasQuickTime) {
+            // Singularity (QuickTime-shape sources): the source's ©xyz is the *only*
+            // location representation in the output — no normalized location dictionary
+            // entry may sit alongside it. (The ©xyz byte-for-byte equality is asserted above;
+            // the source itself carries no location dictionary entry, so this is a net-new
+            // constraint on the output, not a subset check.)
+            assertTrue(
+                "[$label] QuickTime-shape output must carry zero location dictionary entries, " +
+                    "found ${outputProbe.locationRepresentation.genericMdtaKeys}",
+                outputProbe.locationRepresentation.genericMdtaKeys.isEmpty(),
+            )
+        }
+
+        // Regression guard (dictionary-location sources): a source whose location is carried
+        // only as a location dictionary entry must keep it — the engine must NOT suppress it
+        // (there is no finalizer to restore it). This is the non-QuickTime branch of D2. It is
+        // representation-driven so a dictionary-location fixture exercises it without a
+        // test-source edit; the current corpus (QuickTime-shape only) is a no-op here.
+        if (!sourceProbe.locationRepresentation.hasQuickTime &&
+            sourceProbe.locationRepresentation.hasGenericMdta
+        ) {
+            assertTrue(
+                "[$label] dictionary-location source lost its location dictionary entry",
+                outputProbe.locationRepresentation.genericMdtaKeys.containsAll(
+                    sourceProbe.locationRepresentation.genericMdtaKeys,
+                ),
+            )
+        }
+
         // Requirement: Orientation is preserved as a signal, not baked into frames.
         assertEquals("[$label] rotation signal", sourceProbe.videoRotationDegrees, outputProbe.videoRotationDegrees)
         assertEquals(

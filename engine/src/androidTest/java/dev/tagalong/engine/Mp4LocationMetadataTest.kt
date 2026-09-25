@@ -34,6 +34,22 @@ class Mp4LocationMetadataTest {
     }
 
     @Test
+    fun walkerDetectsInventedThreeGppLociBoxUnderMoovUdta() {
+        // The 3GPP LocationInformation box is what FFmpeg's mov muxer invents when it
+        // translates a QuickTime ©xyz for MP4 output. The parser must see it as a distinct
+        // fact from the two location sources it also tracks.
+        val xyz = extendedBox("©xyz", byteArrayOf(0, 0x11, 0x15, 0xc7.toByte()) + "+1.0000+2.0000/".toByteArray())
+        val loci = box("loci", ByteArray(16))
+        val udta = extendedBox("udta", xyz + loci)
+        val moov = box("moov", udta)
+
+        val info = Mp4LocationMetadata.inspect(moov)
+
+        assertTrue("©xyz under moov/udta is still recognized", info.hasQuickTime)
+        assertTrue("loci under moov/udta must be recorded", info.hasThreeGppLocationBox)
+    }
+
+    @Test
     fun walkerRecognizesExtendedSizeBoxesAndGenericMdtaLocationKeys() {
         val locationPayload = byteArrayOf(0, 0x11, 0x15, 0xc7.toByte()) + "+1.0000+2.0000/".toByteArray()
         val xyz = extendedBox("©xyz", locationPayload)

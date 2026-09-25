@@ -37,9 +37,24 @@ object Mp4LocationFinalizer {
 
     private const val TRANSFER_CHUNK = 1L shl 22 // 4 MiB per channel transfer.
 
+    /**
+     * Convenience overload: inspects the source, then finalizes. Prefer the overload that
+     * takes a pre-inspected [LocationRepresentationInfo] when the caller has already probed
+     * the source (the engine does, to decide location suppression) — reusing the inspected
+     * result keeps source probing to a single streaming pass.
+     */
     fun preserve(source: File, output: File) {
+        preserve(source, output, Mp4LocationMetadata.inspect(source))
+    }
+
+    /**
+     * Finalizes [output] with the source's QuickTime location, reusing a [sourceInfo] the
+     * caller inspected earlier. The cut engine inspects the source once (ahead of running
+     * ffmpeg, to decide whether to suppress ffmpeg's location mistranslation) and hands the
+     * result here, so the source is streamed a single time rather than re-probed per stage.
+     */
+    fun preserve(source: File, output: File, sourceInfo: LocationRepresentationInfo) {
         require(source.absoluteFile != output.absoluteFile) { "Source and output must be different files" }
-        val sourceInfo = Mp4LocationMetadata.inspect(source)
         if (!sourceInfo.hasQuickTime) return
 
         val outputSource = Mp4FileByteSource(output)

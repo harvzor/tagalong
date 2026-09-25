@@ -28,6 +28,16 @@ enum class LocationRepresentation(val label: String) {
 data class LocationRepresentationInfo(
     val quickTimeLocations: List<QuickTimeLocation> = emptyList(),
     val genericMdtaKeys: Set<String> = emptySet(),
+    /**
+     * True when the file also carries a 3GPP LocationInformation (`loci`) box under a `moov`.
+     * Camera sources never write it — it is the box FFmpeg's mov muxer *invents* when it
+     * translates a QuickTime `©xyz` for MP4 output, re-quantizing the coordinates and
+     * fabricating an altitude (see `FfmpegCutEngine` / change `cut-command-honesty`).
+     * A cut output is expected to have no such box: the engine suppresses ffmpeg's location
+     * mistranslation at the dictionary so `mov_write_loci_tag` bails, and the finalizer
+     * restores the true `©xyz`.
+     */
+    val hasThreeGppLocationBox: Boolean = false,
 ) {
     val hasQuickTime: Boolean get() = quickTimeLocations.isNotEmpty()
     val hasGenericMdta: Boolean get() = genericMdtaKeys.isNotEmpty()
@@ -87,6 +97,7 @@ object Mp4LocationMetadata {
         val root = parseBoxes(source, 0, source.size)
         val quickTime = mutableListOf<QuickTimeLocation>()
         val genericKeys = linkedSetOf<String>()
+        var threeGpp = false
 
         fun visit(box: Mp4Box, path: List<String>) {
             val currentPath = path + box.type
@@ -96,6 +107,10 @@ object Mp4LocationMetadata {
                     payload = source.readAtom(box.payloadStart, (box.end - box.payloadStart).toInt()),
                 )
             }
+            // 3GPP LocationInformation lives at moov/udta/loci. It is only ever a mistranslation
+            // artifact, never a camera-written tag on these sources — record its presence so the
+            // contract suite can assert the cut never invents it.
+            if (currentPath.takeLast(3) == listOf("moov", "udta", "loci")) threeGpp = true
             if (box.type == "meta") {
                 genericKeys += readLocationKeys(source, box)
             }
@@ -103,7 +118,7 @@ object Mp4LocationMetadata {
         }
 
         root.forEach { visit(it, emptyList()) }
-        return LocationRepresentationInfo(quickTime, genericKeys)
+        return LocationRepresentationInfo(quickTime, genericKeys, threeGpp)
     }
 
     private fun readLocationKeys(source: Mp4ByteSource, meta: Mp4Box): Set<String> {
