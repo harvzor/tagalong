@@ -99,9 +99,11 @@ fun ResultScreen(navController: NavController, viewModel: CutViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
-                // Nudge left so the glyph aligns with the content beneath it (see the same note
-                // in TrimScreen.kt). Visual only — onBack behaviour is unchanged.
-                modifier = Modifier.offset(x = (-12).dp),
+                // Optical alignment, matching TrimScreen.kt: -12dp would put the glyph's box on
+                // the 16dp content edge, but arrow_back's own leftmost point sits 4dp inside its
+                // 24dp viewport, so -16dp is what brings the visible tip onto that edge.
+                // Visual only — onBack behaviour is unchanged.
+                modifier = Modifier.offset(x = (-16).dp),
                 onClick = onBack,
             ) {
                 Icon(

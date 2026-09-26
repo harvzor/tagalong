@@ -149,10 +149,13 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
-                // Nudge left so the glyph aligns with the content beneath it: the root Column
-                // already pads 16dp, and IconButton insets its 24dp glyph ~12dp inside a 48dp
-                // target, which would otherwise leave the arrow indented past the path label.
-                modifier = Modifier.offset(x = (-12).dp),
+                // Optical alignment, not geometric. The root Column pads 16dp, and IconButton
+                // insets its 24dp glyph ~12dp inside a 48dp target, so -12dp is what puts the
+                // glyph's *box* on the 16dp content edge. But the arrow_back path's leftmost
+                // point is x=4 in its own 24dp viewport, so -12dp leaves the visible arrowhead
+                // starting 4dp right of the text below it. -16dp brings the tip itself onto the
+                // content edge. Touch target stays 12dp clear of the screen edge.
+                modifier = Modifier.offset(x = (-16).dp),
                 onClick = onBack,
             ) {
                 Icon(
