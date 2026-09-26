@@ -1,5 +1,7 @@
 package dev.tagalong.app
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -21,7 +24,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -32,6 +34,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -62,6 +65,25 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
     }
 
     val player = rememberVideoPlayer(source.file)
+
+    // Single Trim exit, shared by the visible arrow and the system back gesture (design D1/D2).
+    //
+    // Pause first: rememberVideoPlayer only pauses on ON_STOP, which fires after the slide
+    // transition completes — late enough for a still-playing SurfaceView to trail across the
+    // screen. Pausing at the call site puts the stop ahead of the animation.
+    //
+    // A plain pop covers both launch modes: an in-app pick (home → trim) pops to Home, while a
+    // share-launched session has no Home on the stack, so popBackStack returns false and
+    // finish() returns to the sending app — the exit home-screen's "Back from Trim after a
+    // share" scenario requires. finish() is required rather than relying on popBackStack alone:
+    // BackHandler consumes the gesture, so at a share root a no-op pop would swallow the press
+    // and never run the default start-destination exit that this branch now performs.
+    val activity = LocalContext.current as? Activity
+    val onBack: () -> Unit = {
+        player.pause()
+        if (!navController.popBackStack()) activity?.finish()
+    }
+    BackHandler(onBack = onBack)
 
     // Navigate to the result screen as soon as the cut succeeds. ResultScreen calls
     // viewModel.resetCutState() before popping back, so this LaunchedEffect will not
@@ -126,12 +148,13 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = {
-                // Stop the preview before the transition so the SurfaceView is not still
-                // painting while this screen slides away.
-                player.pause()
-                navController.popBackStack("home", inclusive = false)
-            }) {
+            IconButton(
+                // Nudge left so the glyph aligns with the content beneath it: the root Column
+                // already pads 16dp, and IconButton insets its 24dp glyph ~12dp inside a 48dp
+                // target, which would otherwise leave the arrow indented past the path label.
+                modifier = Modifier.offset(x = (-12).dp),
+                onClick = onBack,
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back to home",
@@ -178,16 +201,6 @@ fun TrimScreen(navController: NavController, viewModel: CutViewModel) {
                 enabled = cutState != CutState.Working,
             ) {
                 Text("Cut and save")
-            }
-            // Demoted to OutlinedButton so "Cut and save" has clear visual priority (design D4).
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    player.pause()
-                    navController.popBackStack("home", inclusive = false)
-                },
-            ) {
-                Text("Pick a different video")
             }
             // Source probe card — reference while trimming (probe-viewer spec).
             // Output metadata is shown on the ResultScreen after a successful cut.

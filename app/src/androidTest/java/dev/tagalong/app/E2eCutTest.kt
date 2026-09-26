@@ -3,6 +3,7 @@ package dev.tagalong.app
 import android.Manifest
 import android.net.Uri
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -207,18 +208,21 @@ class E2eCutTest {
 
     private fun returnToHome() {
         FilePickerRobot.dismissIfOpen(device)
-        waitForAnyComposeText("Cut result", "Pick a different video", "Pick video")
+        // Detect where we are. "Cut and save" is the Trim screen's stable label; the Trim back
+        // arrow is identified only by its "Back to home" content description (the redundant
+        // "Pick a different video" button is gone).
+        waitForAnyComposeText("Cut result", "Cut and save", "Pick video")
 
         when {
             hasComposeText("Cut result") -> {
                 composeTestRule.onNodeWithContentDescription("Back to trim").performClick()
-                waitForComposeText("Pick a different video")
+                waitForComposeContentDescription("Back to home")
             }
-            hasComposeText("Pick a different video") -> Unit
+            hasComposeText("Cut and save") -> Unit
             hasComposeText("Pick video") -> return
         }
 
-        composeTestRule.onNodeWithText("Pick a different video").performClick()
+        composeTestRule.onNodeWithContentDescription("Back to home").performClick()
         waitForComposeText("Pick video")
     }
 
@@ -229,6 +233,14 @@ class E2eCutTest {
 
     private fun waitForComposeText(text: String) {
         composeTestRule.waitUntil(WAIT_PICKER_MS) { hasComposeText(text) }
+    }
+
+    private fun hasComposeContentDescription(description: String): Boolean = runCatching {
+        composeTestRule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty()
+    }.getOrDefault(false)
+
+    private fun waitForComposeContentDescription(description: String) {
+        composeTestRule.waitUntil(WAIT_PICKER_MS) { hasComposeContentDescription(description) }
     }
 
     private fun waitForAnyComposeText(vararg texts: String) {

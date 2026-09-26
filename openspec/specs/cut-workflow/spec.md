@@ -233,8 +233,13 @@ The app SHALL allow the user to play the selected video with audio in the previe
 
 #### Scenario: Playback stops when picking a different video
 
-- **WHEN** playback is active and the user activates "Pick a different video"
+- **WHEN** playback is active and the user leaves the Trim screen in order to pick a different video (the Trim screen's single back control)
 - **THEN** playback stops before the Home screen begins to appear
+
+#### Scenario: Playback stops when leaving the Trim screen by the system back gesture
+
+- **WHEN** playback is active and the user triggers the system back gesture or hardware back while the Trim screen is shown
+- **THEN** playback stops before the destination screen begins to appear
 
 #### Scenario: Playback stops when the cut is saved
 
