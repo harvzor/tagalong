@@ -72,6 +72,7 @@ RUN ./gradlew dependencies --no-daemon
 # ---------------------------------------------------------------------------
 COPY app/ app/
 COPY engine/ engine/
+COPY scripts/ scripts/
 
 ARG BUILD_TYPE=debug
 ARG VERSION
@@ -85,14 +86,8 @@ RUN --mount=type=secret,id=keystore,target=/tmp/release.keystore \
     [ -f "/tmp/release.keystore" ] && \
         SIGNING_FLAGS="-PreleaseKeystorePath=/tmp/release.keystore -PreleaseStorePassword=${RELEASE_STORE_PASSWORD} -PreleaseKeyAlias=${RELEASE_KEY_ALIAS} -PreleaseKeyPassword=${RELEASE_KEY_PASSWORD}"; \
     ./gradlew assemble${BUILD_TYPE^} ${VERSION_FLAG} ${SIGNING_FLAGS} --no-daemon && \
-    mkdir -p /out && \
-    find app/build/outputs/apk -name "*.apk" | while read f; do \
-        if [ -n "${VERSION}" ]; then \
-            cp "$f" "/out/tagalong-${VERSION}.apk"; \
-        else \
-            cp "$f" /out/; \
-        fi; \
-    done
+    chmod +x scripts/collect-apks.sh && \
+    scripts/collect-apks.sh "$(printf '%s' "${BUILD_TYPE}" | tr '[:upper:]' '[:lower:]')" "${VERSION}" /out
 
 # =============================================================================
 # Stage 2: export
