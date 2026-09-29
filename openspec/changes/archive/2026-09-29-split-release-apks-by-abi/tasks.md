@@ -60,6 +60,17 @@ Each item here maps to a scenario in the `release-artifacts` delta.
 The workflow file is expected to need no change. Confirm by observation, not inspection.
 
 - [x] 7.1 Confirm `.github/workflows/release-build.yml` still globs `out/*.apk` and needs no change given three assets.
-- [ ] 7.2 Cut a release candidate tag and confirm the resulting GitHub Release carries three distinct, signed assets with the version in each filename.
-- [ ] 7.3 Confirm no expected asset is missing from the release — treat a missing artifact as an incomplete run rather than a success.
-- [ ] 7.4 Record the before/after download size for the `arm64-v8a` artifact in the release notes, and repeat the uninstall-before-switch note there, since existing installs are of the old combined APK.
+- [x] 7.2 Cut a release candidate tag and confirm the resulting GitHub Release carries three distinct, signed assets with the version in each filename.
+  `v0.8.0-rc1` → run succeeded in 4m33s. Three assets, all `apksigner verify` = VERIFIED against the
+  release key (`CN=Bluetooth Bouncer`), all sharing one signature digest, all `versionCode=800 /
+  versionName=0.8.0-rc1`. Sizes 70 / 76 / 118 MB — identical to the local build.
+- [x] 7.3 Confirm no expected asset is missing from the release — treat a missing artifact as an incomplete run rather than a success.
+  Exactly 3 of 3 present, one per entry in `shippedAbis` plus `universal`. Independently re-checked the
+  5.3/5.4 criteria on the *published* files: `universal` contains exactly `arm64-v8a` + `x86_64`
+  (11 `.so` each) and **no** `armeabi-v7a` / `x86` — the design fix confirmed in CI, not just locally.
+  Installed the CI-signed `arm64-v8a` artifact on the emulator: installs, launches, renders, 0 `UnsatisfiedLinkError`.
+- [x] 7.4 Record the before/after download size for the `arm64-v8a` artifact in the release notes, and repeat the uninstall-before-switch note there, since existing installs are of the old combined APK.
+  Release body was empty (the workflow sets neither `body` nor `generate_release_notes`), so the notes
+  were authored by hand: **243 MB → 70 MB**, uninstall-before-switch, the 32-bit "unsupported, not
+  damaged" sentence, and the three-artifact pick-table. Tag marked `--prerelease` so an RC does not
+  become "Latest" over the current stable `v0.7.0`.
