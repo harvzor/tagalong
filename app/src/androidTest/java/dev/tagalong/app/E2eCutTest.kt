@@ -79,13 +79,13 @@ class E2eCutTest {
             try {
                 runSample(sample)
             } catch (failure: Throwable) {
-                failures += "${sample.fileName}: ${failure.message ?: failure::class.java.simpleName}"
+                failures += "${sample.fileName}: ${failure.describe()}"
             } finally {
                 if (index < samples.lastIndex) {
                     runCatching { returnToHome() }
                         .onFailure { resetFailure ->
                             failures += "${sample.fileName}: could not reset app for next sample: " +
-                                (resetFailure.message ?: resetFailure::class.java.simpleName)
+                                resetFailure.describe()
                         }
                 }
                 cleanupSample(sample)
@@ -192,6 +192,33 @@ class E2eCutTest {
                 sourceProbe.locationRepresentation.genericMdtaKeys,
             ),
         )
+    }
+
+    /**
+     * Render a failure usefully.
+     *
+     * The original rendering was `message ?: simpleName`, which for exceptions that carry no
+     * message (e.g. Compose's `StaleObjectException`) collapsed the whole failure to a bare
+     * class name and discarded the stack. That made this test's intermittent UI failures
+     * undiagnosable from the JUnit XML alone. Keep the class, the message, the call frames, and
+     * the cause chain.
+     */
+    private fun Throwable.describe(): String {
+        val head = buildString {
+            append(this@describe::class.java.name)
+            message?.let { append(": ").append(it) }
+        }
+        val frames = stackTrace
+            .filter { it.className.startsWith("dev.tagalong.") || it.className.contains("compose.ui.test") }
+            .take(6)
+            .joinToString(" | ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
+        val causeChain = generateSequence(cause) { it.cause }
+            .joinToString(" <- ") { it::class.java.simpleName }
+        return buildString {
+            append(head)
+            if (frames.isNotEmpty()) append(" @ ").append(frames)
+            if (causeChain.isNotEmpty()) append(" caused by ").append(causeChain)
+        }
     }
 
     private fun cleanupSample(sample: TestSamples.SampleVideo) {

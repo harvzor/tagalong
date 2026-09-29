@@ -1,6 +1,9 @@
 package dev.tagalong.app
 
+import android.os.SystemClock
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 
@@ -28,6 +31,9 @@ object FilePickerRobot {
     private const val APP_PKG = "dev.tagalong.app"
 
     private const val WAIT_PICKER_MS = 15_000L
+    private const val WAIT_APP_FOREGROUND_MS = 3_000L
+    private const val RETRY_BACKOFF_MS = 250L
+    private const val MAX_DISMISS_ATTEMPTS = 5
 
     /**
      * Waits for the DocumentsUI file chooser, then selects exactly one item for [sample].
@@ -76,7 +82,7 @@ object FilePickerRobot {
         val exactMatches = device.findObjects(byExactCard)
         when {
             exactMatches.size == 1 -> {
-                exactMatches.single().click()
+                clickCurrentMatch(device, byExactCard, sample.fileName)
                 return
             }
             exactMatches.size > 1 -> error(
@@ -88,7 +94,7 @@ object FilePickerRobot {
         // Accept a stem match only when it is unambiguous.
         val stemMatches = device.findObjects(byStemCard)
         when (stemMatches.size) {
-            1 -> stemMatches.single().click()
+            1 -> clickCurrentMatch(device, byStemCard, sample.fileName)
             0 -> error(
                 "[${sample.fileName}] no matching item found in DocumentsUI search results; " +
                     "expected the seeded filename or unique stem"
@@ -100,12 +106,63 @@ object FilePickerRobot {
         }
     }
 
-    /** Dismisses DocumentsUI after a failed selection so the next sample starts in the app. */
+    /**
+     * Re-resolve [selector] and click whichever row currently matches it, retrying while
+     * DocumentsUI recycles its rows.
+     *
+     * Why this exists: `UiObject2` is a handle onto an accessibility node, not a durable
+     * locator. DocumentsUI rebinds and animates its result rows -- most actively just after the
+     * search string is applied, which is precisely when a selection is attempted here -- so a
+     * handle collected a moment earlier can be recycled before the click lands, surfacing as
+     * `StaleObjectException`. Re-finding from the selector is the documented remedy, so the click
+     * never depends on a handle that may already be gone. This is what made the end-to-end cut
+     * test intermittently red on an otherwise healthy build.
+     *
+     * Callers still decide *what* to click via their own exact/stem match counts; only the click
+     * itself is made robust here. Ambiguity is deliberately not retried away -- a caller that saw
+     * two matches still reports two matches.
+     */
+    private fun clickCurrentMatch(device: UiDevice, selector: BySelector, label: String) {
+        val deadline = SystemClock.uptimeMillis() + WAIT_PICKER_MS
+        var lastStale: StaleObjectException? = null
+        while (SystemClock.uptimeMillis() < deadline) {
+            try {
+                val target = device.findObject(selector)
+                if (target != null) {
+                    target.click()
+                    return
+                }
+            } catch (stale: StaleObjectException) {
+                lastStale = stale
+            }
+            runCatching { device.waitForIdle() }
+            Thread.sleep(RETRY_BACKOFF_MS)
+        }
+        // Re-throw the original if we only ever lost the node; otherwise the row genuinely
+        // vanished, which is a different problem and should read as one.
+        lastStale?.let { throw it }
+        error("[$label] file card disappeared from DocumentsUI before it could be clicked")
+    }
+
+    /**
+     * Dismisses DocumentsUI after a failed selection so the next sample starts in the app.
+     *
+     * Bounded loop rather than one BACK, because one is not enough: with the search field
+     * focused, a single BACK closes the keyboard or exits search while the picker window stays
+     * foreground. That matters more than it looks -- if DocumentsUI is left up, no Compose
+     * hierarchy is reachable, so one sample's failure makes every later sample fail with an
+     * unrelated-looking "no compose hierarchies" message and the real cause is unrecoverable
+     * from the report.
+     */
     fun dismissIfOpen(device: UiDevice) {
-        if (docsPackages.any { device.findObject(By.pkg(it)) != null }) {
+        repeat(MAX_DISMISS_ATTEMPTS) {
+            if (!isPickerOpen(device)) return
             device.pressBack()
-            device.wait(Until.hasObject(By.pkg(APP_PKG)), WAIT_PICKER_MS)
-            device.waitForIdle()
+            runCatching { device.waitForIdle() }
+            runCatching { device.wait(Until.hasObject(By.pkg(APP_PKG)), WAIT_APP_FOREGROUND_MS) }
         }
     }
+
+    private fun isPickerOpen(device: UiDevice): Boolean =
+        docsPackages.any { packageName -> device.findObject(By.pkg(packageName)) != null }
 }
