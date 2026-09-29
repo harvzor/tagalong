@@ -138,6 +138,51 @@ The picker was subsequently switched from `PickVisualMedia` to `ACTION_OPEN_DOCU
 
 ---
 
+## Shipped architecture matrix
+
+Release builds publish **three installable artifacts**, not one:
+
+| Artifact | Architectures in `lib/` | ~Size |
+|---|---|---|
+| `tagalong-<version>-arm64-v8a.apk` | `arm64-v8a` | 70 MB |
+| `tagalong-<version>-x86_64.apk` | `x86_64` | 76 MB |
+| `tagalong-<version>-universal.apk` | `arm64-v8a`, `x86_64` | 118 MB |
+
+The architecture set is declared once as `shippedAbis` in `app/build.gradle.kts` and feeds both
+`ndk.abiFilters` and `splits.abi.include`. **Change it in that one place only.**
+
+**32-bit (`armeabi-v7a`, `x86`) is not shipped.** `minSdk` 31 makes 32-bit-ARM-only devices
+unreachable in practice, and dropping them is what takes a modern phone's download from 243 MB to
+70 MB. A 32-bit-only device gets `INSTALL_FAILED_NO_MATCHING_ABIS` at install time — a clear
+incompatibility message, never a broken install that fails later. Restoring an architecture is a
+one-line edit to `shippedAbis`.
+
+**Per-architecture publishing does not touch the preservation contract.** Every artifact runs the
+identical materialise → probe → cut pipeline; verified by cutting the same source on the
+`arm64-v8a` and `universal` artifacts and diffing the surviving tags — identical, GPS `location`
+and `location-eng` and `creation_time` included. Nothing here weakens the metadata guarantees that
+are this app's reason for existing.
+
+**Two traps, both measured rather than assumed** (see
+`openspec/changes/split-release-apks-by-abi/design.md`):
+
+- `splits.abi.include()` decides which **splits** are generated; it does **not** bound the
+  universal APK. Without `ndk.abiFilters`, the universal artifact merged all four ABIs from the
+  `ffmpeg-kit-full-gpl` AAR — 243 MB, 32-bit intact. The per-ABI splits were still correct, so
+  nothing in a build log or an install test revealed it; only inspecting `lib/` inside the
+  universal APK did. Any future change to the architecture set **must** be verified by listing
+  `lib/` in every published artifact.
+- The export step is `scripts/collect-apks.sh`, invoked by the `Dockerfile`. It derives each
+  artifact's name from the output itself and prunes `androidTest/`, so no output is overwritten
+  and no instrumented-test APK is ever published. Keep new release logic in that script rather
+  than inlining it in the `Dockerfile` — the script is runnable against a host build tree, which
+  is how its collision and scoping guards were tested without a container build.
+
+A future move to Google Play replaces all three artifacts with a single AAB, which a store slices
+per device automatically. At that point this section and the split configuration retire together.
+
+---
+
 ## Known open gaps
 
 ### 🐛 Rotation signal lost in re-encode mode (blocks step 2)

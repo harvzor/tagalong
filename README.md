@@ -58,7 +58,13 @@ Other [solutions](./docs/solutions.md) were considered.
 
 ## Install
 
-Download the latest APK from [GitHub Releases](https://github.com/harvzor/tagalong/releases) and install it on your phone.
+Get the latest release from [GitHub Releases](https://github.com/harvzor/tagalong/releases). Download the APK that matches your phone:
+
+| File                               | For which phone                                                                   |
+|------------------------------------|-----------------------------------------------------------------------------------|
+| `tagalong-<version>-arm64-v8a.apk` | Almost every phone made since 2016 - modern ARM phones                            |
+| `tagalong-<version>-x86_64.apk`    | 64-bit x86 - some emulators, a few tablets and Chromebooks                        |
+| `tagalong-<version>-universal.apk` | **Not sure? Use this one.** Works on any version - but the install size is larger |
 
 ## Permissions
 
@@ -75,7 +81,7 @@ The only host dependency is Docker (BuildKit-capable). No Android SDK, JDK, or G
 docker build --output=out .
 ```
 
-The APK is written to `./out/app-debug.apk`.
+The APKs are written to `./out/` under their build-default names (`app-debug.apk`, plus the per-architecture and universal variants of it).
 
 To build a signed release APK locally (requires a keystore — see [Releases](#releases)):
 
@@ -94,7 +100,7 @@ docker build \
   .
 ```
 
-The signed APK is written to `./out/tagalong-<version>.apk`. The keystore and credential values are never baked into any image layer.
+The signed APKs are written to `./out/` as `tagalong-<version>-arm64-v8a.apk`, `tagalong-<version>-x86_64.apk` and `tagalong-<version>-universal.apk`. The keystore and credential values are never baked into any image layer.
 
 ### Local emulator testing
 
@@ -143,7 +149,7 @@ Run the engine instrumented test suite:
 
 ## Releases
 
-Pushing a version tag triggers an automated GitHub Actions workflow that builds a signed release APK and attaches it to the corresponding GitHub Release:
+Pushing a version tag triggers an automated GitHub Actions workflow that builds the signed release APKs and attaches all of them to the corresponding GitHub Release:
 
 ```bash
 git tag v1.0.0

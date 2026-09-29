@@ -3,6 +3,18 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Single source of truth for the shipped architecture set. Feeds BOTH ndk.abiFilters below
+// (which bounds the merged native-lib set, and therefore what the universal APK can contain)
+// and splits.abi.include further down (which decides which per-architecture splits are
+// generated). One declaration, so the two cannot drift apart.
+//
+// The 32-bit ABIs (armeabi-v7a, x86) are deliberately absent: unreachable at minSdk 31. They
+// are excluded from every artifact, including the universal one -- ndk.abiFilters is what makes
+// that exclusion complete, because splits.abi.include() alone does NOT bound the universal APK.
+// Measured on AGP 9.5: include() by itself left the universal APK merging all four ABIs from
+// the ffmpeg-kit AAR, 243 MB with 32-bit intact. See openspec: split-release-apks-by-abi.
+val shippedAbis = listOf("arm64-v8a", "x86_64")
+
 android {
     namespace = "dev.tagalong.app"
     compileSdk = 36
@@ -31,11 +43,23 @@ android {
         versionCode = if (parsedParts != null) parsedParts[0] * 10_000 + parsedParts[1] * 100 + parsedParts[2] else 1
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Bounds which architectures enter the merged native-lib set, and so what the combined
+        // universal APK can contain. Required: splits.abi.include() governs only which splits
+        // are generated. Fed from shippedAbis so there is one list, not two to keep in sync.
+        ndk {
+            abiFilters += shippedAbis
+        }
     }
 
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release")
+            // Deliberately false, and to be enabled only in a separate change whose precondition
+            // is a release-build verification path: R8 renames the Java/Kotlin bytecode that
+            // ffmpeg-kit's native code reaches back into by exact class name, and every
+            // instrumented suite here builds `debug` (minify off), so none would catch it.
+            // See openspec design: "Deferring minification is a sequencing decision, not a rejection".
             isMinifyEnabled = false
         }
     }
@@ -58,6 +82,20 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    // Ship one APK per supported architecture plus a combined "universal" APK, rather than a
+    // single APK carrying every ABI the ffmpeg-kit-full-gpl AAR bundles. `reset()` is required:
+    // without it the AGP default ABI list is kept alongside the explicit include(). Note that
+    // include() here decides which splits exist; the architectures themselves are bounded by
+    // ndk.abiFilters in defaultConfig, both fed from shippedAbis above.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include(*shippedAbis.toTypedArray())
+            isUniversalApk = true
         }
     }
 }
