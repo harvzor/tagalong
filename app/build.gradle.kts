@@ -55,11 +55,9 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release")
-            // Deliberately false, and to be enabled only in a separate change whose precondition
-            // is a release-build verification path: R8 renames the Java/Kotlin bytecode that
-            // ffmpeg-kit's native code reaches back into by exact class name, and every
-            // instrumented suite here builds `debug` (minify off), so none would catch it.
-            // See openspec design: "Deferring minification is a sequencing decision, not a rejection".
+            // Off by decision, not oversight: saves ~24 MB/artifact, declined as unverifiable
+            // rather than as too small. Read the record before enabling.
+            // openspec/changes/archive/2026-09-30-enable-code-shrinking/notes/apply-measurements.md
             isMinifyEnabled = false
         }
     }
