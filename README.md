@@ -39,6 +39,8 @@ Standard video editors wipe a clip’s original date and location the moment you
 | Tagalong       | ✅                   | ❌              | ✅                        | ✅                       | ✅           |
 | Google Photos  | ❌                   | ✅              | ✅                        | ✅                       | ❌           |
 | Xiaomi Gallery | ❌                   | ✅              | ❌                        | ❌                       | ❌           |
+| CapCut         | ❌                   | ✅              | ❌                        | ❌                       | ❌           |
+| YouCut         | ❌                   | ✅              | ❌                        | ❌                       | ❌           |
 
 There are deeper comparisons in the [comparisons](./comparisons) folder.
 

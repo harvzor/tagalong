@@ -1,0 +1,107 @@
+[ExifTool]      ExifTool Version Number         : 13.55
+[File:System]   File Name                       : lv_0_20260930215706.mp4
+[File:System]   Directory                       : sample-videos
+[File:System]   File Size                       : 3.3 MB
+[File:System]   File Modification Date/Time     : 2026:09:30 21:59:42+02:00
+[File:System]   File Access Date/Time           : 2026:09:30 22:01:41+02:00
+[File:System]   File Inode Change Date/Time     : 2026:09:30 21:59:42+02:00
+[File:System]   File Permissions                : -rw-r--r--
+[File]          File Type                       : MP4
+[File]          File Type Extension             : mp4
+[File]          MIME Type                       : video/mp4
+[QuickTime]     Major Brand                     : MP4 Base Media v1 [IS0 14496-12:2003]
+[QuickTime]     Minor Version                   : 0.2.0
+[QuickTime]     Compatible Brands               : isom, iso2, avc1, mp41
+[QuickTime]     Free                            : (Binary data 0 bytes, use -b option to extract)
+[QuickTime]     Media Data Size                 : 3335329
+[QuickTime]     Media Data Offset               : 48
+[QuickTime]     Media Data                      : (Binary data 3335329 bytes, use -b option to extract)
+[QuickTime]     Movie Header Version            : 0
+[QuickTime]     Create Date                     : 0000:00:00 00:00:00
+[QuickTime]     Modify Date                     : 0000:00:00 00:00:00
+[QuickTime]     Time Scale                      : 1000
+[QuickTime]     Duration                        : 5.07 s
+[QuickTime]     Preferred Rate                  : 1
+[QuickTime]     Preferred Volume                : 100.00%
+[QuickTime]     Matrix Structure                : 1 0 0 0 1 0 0 0 1
+[QuickTime]     Preview Time                    : 0 s
+[QuickTime]     Preview Duration                : 0 s
+[QuickTime]     Poster Time                     : 0 s
+[QuickTime]     Selection Time                  : 0 s
+[QuickTime]     Selection Duration              : 0 s
+[QuickTime]     Current Time                    : 0 s
+[QuickTime]     Next Track ID                   : 3
+[QuickTime]     Handler Type                    : Metadata Tags
+[QuickTime:Track1] Track Header Version         : 0
+[QuickTime:Track1] Track Create Date            : 0000:00:00 00:00:00
+[QuickTime:Track1] Track Modify Date            : 0000:00:00 00:00:00
+[QuickTime:Track1] Track ID                     : 1
+[QuickTime:Track1] Track Duration               : 5.07 s
+[QuickTime:Track1] Track Layer                  : 0
+[QuickTime:Track1] Track Volume                 : 0.00%
+[QuickTime:Track1] Matrix Structure             : 1 0 0 0 1 0 0 0 1
+[QuickTime:Track1] Image Width                  : 720
+[QuickTime:Track1] Image Height                 : 1280
+[QuickTime:Track1] Unknown edts                 : (Binary data 28 bytes, use -b option to extract)
+[QuickTime:Track1] Media Header Version         : 0
+[QuickTime:Track1] Media Create Date            : 0000:00:00 00:00:00
+[QuickTime:Track1] Media Modify Date            : 0000:00:00 00:00:00
+[QuickTime:Track1] Media Time Scale             : 1000000
+[QuickTime:Track1] Media Duration               : 5.07 s
+[QuickTime:Track1] Media Language Code          : und
+[QuickTime:Track1] Handler Type                 : Video Track
+[QuickTime:Track1] Handler Description          : VideoHandler
+[QuickTime:Track1] Graphics Mode                : srcCopy
+[QuickTime:Track1] Op Color                     : 0 0 0
+[QuickTime:Track1] Compressor ID                : avc1
+[QuickTime:Track1] Source Image Width           : 720
+[QuickTime:Track1] Source Image Height          : 1280
+[QuickTime:Track1] X Resolution                 : 72
+[QuickTime:Track1] Y Resolution                 : 72
+[QuickTime:Track1] Bit Depth                    : 24
+[QuickTime:Track1] AVC Configuration            : (Binary data 34 bytes, use -b option to extract)
+[QuickTime:Track1] Video Frame Rate             : 30
+[QuickTime:Track1] Sync Sample Table            : (Binary data 16 bytes, use -b option to extract)
+[QuickTime:Track1] Sample To Chunk              : (Binary data 32 bytes, use -b option to extract)
+[QuickTime:Track1] Sample Sizes                 : (Binary data 620 bytes, use -b option to extract)
+[QuickTime:Track1] Chunk Offset                 : (Binary data 376 bytes, use -b option to extract)
+[QuickTime:Track2] Track Header Version         : 0
+[QuickTime:Track2] Track Create Date            : 0000:00:00 00:00:00
+[QuickTime:Track2] Track Modify Date            : 0000:00:00 00:00:00
+[QuickTime:Track2] Track ID                     : 2
+[QuickTime:Track2] Track Duration               : 3.05 s
+[QuickTime:Track2] Track Layer                  : 0
+[QuickTime:Track2] Track Volume                 : 100.00%
+[QuickTime:Track2] Matrix Structure             : 1 0 0 0 1 0 0 0 1
+[QuickTime:Track2] Unknown edts                 : (Binary data 28 bytes, use -b option to extract)
+[QuickTime:Track2] Media Header Version         : 0
+[QuickTime:Track2] Media Create Date            : 0000:00:00 00:00:00
+[QuickTime:Track2] Media Modify Date            : 0000:00:00 00:00:00
+[QuickTime:Track2] Media Time Scale             : 48000
+[QuickTime:Track2] Media Duration               : 3.05 s
+[QuickTime:Track2] Media Language Code          : und
+[QuickTime:Track2] Handler Type                 : Audio Track
+[QuickTime:Track2] Handler Description          : SoundHandler
+[QuickTime:Track2] Balance                      : 0
+[QuickTime:Track2] Audio Format                 : mp4a
+[QuickTime:Track2] Audio Channels               : 2
+[QuickTime:Track2] Audio Bits Per Sample        : 16
+[QuickTime:Track2] Audio Sample Rate            : 48000
+[QuickTime:Track2] Unknown esds                 : (Binary data 43 bytes, use -b option to extract)
+[QuickTime:Track2] Time To Sample Table         : (Binary data 48 bytes, use -b option to extract)
+[QuickTime:Track2] Sample To Chunk              : (Binary data 956 bytes, use -b option to extract)
+[QuickTime:Track2] Sample Sizes                 : (Binary data 584 bytes, use -b option to extract)
+[QuickTime:Track2] Chunk Offset                 : (Binary data 372 bytes, use -b option to extract)
+[QuickTime:Track2] Sample Group Description     : (Binary data 18 bytes, use -b option to extract)
+[QuickTime:Track2] Sample To Group              : (Binary data 20 bytes, use -b option to extract)
+[QuickTime:Keys] Hw                             : 1
+[QuickTime:Keys] Lv Meta Info                   : {"data":{"adsTemplateId":"","appVersion":"19.7.0","businessComponentId":"","businessTemplateId":"","capabilityName":"","commercial_params":{},"draftInfo":{"videoMaterialId":"1000109893"},"editSource":"","editType":"edit","enterFrom":"new","exportType":"export","extendTemplateId":"","extendTemplateType":0,"filterId":"","greenscreenLayoutType":"","infoStickerId":"","is_use_audio_separation":1,"launchMode":"launch","launch_enter_from":"enter_launch","lock_cnt_list":"","movie3dTextTemplateId":"","original_volume":100,"os":"android","product":"vicut","region":"DE","slowMotion":"none","source_platform":"mobile_2","stickerId":"","templateId":"","textSpecialEffect":"","theme_params":"[]","transferMethod":"","transitions":"","used_ugc_timbre_info":"{\"text_to_speech\":[],\"voice_conversion\":[]}","videoAnimation":"","videoEffectId":"","videoId":"14c6e583-36de-4fd8-8371-425d8ef96a0d"},"source_type":"vicut"}
+[QuickTime:Keys] Aigc Info                      : {"aigc_label_type":0,"source_info":""}
+[QuickTime:Keys] Bitrate                        : 10000000
+[QuickTime:Keys] Maxrate                        : 30000000
+[QuickTime:Keys] Te Is Reencode                 : 1
+[QuickTime:Keys] Encoder                        : bytevehwavc
+[Composite]     Image Size                      : 720x1280
+[Composite]     Megapixels                      : 0.922
+[Composite]     Avg Bitrate                     : 5.27 Mbps
+[Composite]     Rotation                        : 0
